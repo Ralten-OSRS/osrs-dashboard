@@ -10,8 +10,18 @@ your OSRS name, which is also what the hiscores lookup uses. Your dashboard
 (and its XP history) are saved right next to your screenshots, so everything
 stays with your account data.
 """
+import json
 import sys
 from pathlib import Path
+from urllib.request import Request, urlopen
+
+# Bump this in the same commit that gets tagged for a release. It is the only
+# thing the update check compares against, so a stale value here means users
+# are told they are current when they are not.
+APP_VERSION = "1.0.0"
+
+RELEASES_API = "https://api.github.com/repos/Ralten-OSRS/osrs-dashboard/releases/latest"
+RELEASES_PAGE = "https://github.com/Ralten-OSRS/osrs-dashboard/releases/latest"
 
 # Make the engine + drop tables importable whether we're running from source
 # (python dashboard_app.py) or frozen into an .exe by PyInstaller. PyInstaller
@@ -19,6 +29,49 @@ from pathlib import Path
 _HERE = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
 if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))
+
+
+def _version_tuple(text):
+    """Turn a tag like 'v1.2.3' into (1, 2, 3). Unparseable pieces become 0."""
+    pieces = []
+    for part in str(text or "").strip().lstrip("vV").split(".")[:4]:
+        digits = ""
+        for ch in part:
+            if not ch.isdigit():
+                break
+            digits += ch
+        pieces.append(int(digits) if digits else 0)
+    return tuple(pieces) if pieces else (0,)
+
+
+def check_for_update(timeout=2.5):
+    """Print a notice if a newer release exists on GitHub.
+
+    This only ever reads and prints. Every failure - offline, rate limited,
+    GitHub changing its response, a proxy in the way - is swallowed on
+    purpose. An update notice is a courtesy, and it must never be the reason
+    someone cannot build their dashboard.
+    """
+    try:
+        request = Request(
+            RELEASES_API,
+            headers={
+                "Accept": "application/vnd.github+json",
+                "User-Agent": f"osrs-dashboard/{APP_VERSION}",
+            },
+        )
+        with urlopen(request, timeout=timeout) as response:
+            latest = json.loads(response.read().decode("utf-8")).get("tag_name")
+        if not latest or _version_tuple(latest) <= _version_tuple(APP_VERSION):
+            return
+        print("-" * 58)
+        print(f"  An update is available: {latest}   (you have v{APP_VERSION})")
+        print(f"  Download it here: {RELEASES_PAGE}")
+        print("  Skipping it is fine. Your dashboard keeps working either way.")
+        print("-" * 58)
+        print()
+    except Exception:  # noqa: BLE001 - a failed check has to stay invisible
+        pass
 
 
 def banner():
@@ -94,6 +147,7 @@ def choose_character():
 
 def run():
     banner()
+    check_for_update()
     print("Looking for your RuneLite screenshots...\n")
     name, path = choose_character()
     if not path:
