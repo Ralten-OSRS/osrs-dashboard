@@ -15,20 +15,16 @@ import sys
 from pathlib import Path
 from urllib.request import Request, urlopen
 
-# Bump this in the same commit that gets tagged for a release. It is the only
-# thing the update check compares against, so a stale value here means users
-# are told they are current when they are not.
-APP_VERSION = "1.0.0"
-
-RELEASES_API = "https://api.github.com/repos/Ralten-OSRS/osrs-dashboard/releases/latest"
-RELEASES_PAGE = "https://github.com/Ralten-OSRS/osrs-dashboard/releases/latest"
-
 # Make the engine + drop tables importable whether we're running from source
 # (python dashboard_app.py) or frozen into an .exe by PyInstaller. PyInstaller
 # unpacks bundled modules to sys._MEIPASS at runtime.
 _HERE = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
 if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))
+
+# Version and GitHub coordinates live in version.py so the generator can stamp
+# the same numbers into the dashboard and into in-app issue reports.
+from version import APP_VERSION, RELEASES_LATEST_API, RELEASES_PAGE  # noqa: E402
 
 
 def _version_tuple(text):
@@ -54,7 +50,7 @@ def check_for_update(timeout=2.5):
     """
     try:
         request = Request(
-            RELEASES_API,
+            RELEASES_LATEST_API,
             headers={
                 "Accept": "application/vnd.github+json",
                 "User-Agent": f"osrs-dashboard/{APP_VERSION}",

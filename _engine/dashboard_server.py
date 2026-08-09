@@ -3,6 +3,8 @@
 
 import json
 import os
+import platform
+import sys
 import threading
 import time
 import webbrowser
@@ -11,6 +13,16 @@ from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path, PurePosixPath
 from urllib.parse import parse_qs, urlparse
+from urllib.request import Request, urlopen
+
+from version import APP_VERSION, RELEASES_API
+
+# How long a cached copy of the releases feed is treated as current. What's New
+# is reference material, not live data, so an hour keeps GitHub's rate limit
+# comfortable even if someone reloads the dashboard repeatedly.
+RELEASES_CACHE_SECONDS = 3600
+RELEASES_TIMEOUT = 2.5
+RELEASES_KEEP = 10
 
 
 class DashboardHTTPServer(ThreadingHTTPServer):
@@ -26,6 +38,11 @@ class DashboardHTTPServer(ThreadingHTTPServer):
         self.clients = set()
         self.had_client = False
         self.client_generation = 0
+        self.releases_lock = threading.Lock()
+        # Summary of the most recent successful build. Diagnostics are read
+        # from here rather than rescanning, so opening the report dialog costs
+        # nothing even on an account with thousands of screenshots.
+        self.last_build = {}
 
     def register_client(self, client_id):
         with self.client_lock:
@@ -114,6 +131,99 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             os.fsync(f.fileno())
         os.replace(temp, path)
 
+    def _diagnostics(self):
+        """Facts a bug report needs, none of which identify the user.
+
+        Everything here comes from the last build summary or the interpreter
+        itself. No scanning, no network, and deliberately no player name or
+        file path — a public issue should not carry either.
+        """
+        build = self.server.last_build or {}
+        return {
+            "version": APP_VERSION,
+            "packaged": bool(getattr(sys, "frozen", False)),
+            "os": f"{platform.system()} {platform.release()}",
+            "python": platform.python_version(),
+            "screenshots": build.get("screenshots"),
+            "hiscores_ok": build.get("hiscores"),
+            "built_at": build.get("generated_at"),
+        }
+
+    def _releases_cache_path(self):
+        return self.server.root / "releases_cache.json"
+
+    def _load_releases_cache(self):
+        try:
+            with self._releases_cache_path().open(encoding="utf-8") as f:
+                cached = json.load(f)
+        except (OSError, json.JSONDecodeError):
+            return None
+        return cached if isinstance(cached, dict) else None
+
+    def _store_releases_cache(self, payload):
+        path = self._releases_cache_path()
+        temp = path.with_name(path.name + ".tmp")
+        try:
+            with temp.open("w", encoding="utf-8") as f:
+                json.dump(payload, f, indent=2)
+                f.write("\n")
+            os.replace(temp, path)
+        except OSError:
+            # A cache that cannot be written is not worth failing a page load
+            # over. The panel still renders from the response we just fetched.
+            pass
+
+    def _fetch_releases(self):
+        request = Request(
+            RELEASES_API,
+            headers={
+                "Accept": "application/vnd.github+json",
+                "User-Agent": f"osrs-dashboard/{APP_VERSION}",
+            },
+        )
+        with urlopen(request, timeout=RELEASES_TIMEOUT) as response:
+            raw = json.loads(response.read().decode("utf-8"))
+        if not isinstance(raw, list):
+            raise ValueError("Unexpected releases response.")
+        releases = []
+        for entry in raw[:RELEASES_KEEP]:
+            if not isinstance(entry, dict) or entry.get("draft"):
+                continue
+            releases.append({
+                "tag": entry.get("tag_name") or "",
+                "name": entry.get("name") or entry.get("tag_name") or "",
+                "published_at": (entry.get("published_at") or "")[:10],
+                "notes": entry.get("body") or "",
+                "url": entry.get("html_url") or "",
+                "prerelease": bool(entry.get("prerelease")),
+            })
+        return {
+            "version": 1,
+            "fetched_at": time.time(),
+            "current": APP_VERSION,
+            "releases": releases,
+        }
+
+    def _releases_payload(self):
+        """Serve the releases list, preferring a fresh fetch, falling back to disk.
+
+        Offline is an ordinary outcome here, not an error: the panel is
+        reference material and the dashboard's core has to render with no
+        network at all. A stale cache beats an error message, and no cache at
+        all yields an empty list the page hides.
+        """
+        cached = self._load_releases_cache()
+        if cached and (time.time() - float(cached.get("fetched_at") or 0)) < RELEASES_CACHE_SECONDS:
+            return {**cached, "stale": False, "current": APP_VERSION}
+        try:
+            fresh = self._fetch_releases()
+        except Exception:  # noqa: BLE001 - offline, rate limited, or changed shape
+            if cached:
+                return {**cached, "stale": True, "current": APP_VERSION}
+            return {"version": 1, "releases": [], "stale": True, "current": APP_VERSION}
+        self._store_releases_cache(fresh)
+        return {**fresh, "stale": False}
+
     def _valid_screenshot_path(self, value):
         if not isinstance(value, str) or not value.strip():
             return None
@@ -165,7 +275,12 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 "ok": True,
                 "player": self.server.engine.PLAYER_NAME,
                 "interactive": True,
+                "diagnostics": self._diagnostics(),
             })
+            return
+        if route == "/api/releases":
+            with self.server.releases_lock:
+                self._send_json(200, self._releases_payload())
             return
         if route == "/api/favorites":
             with self.server.favorites_lock:
@@ -224,6 +339,8 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 result = {"ok": False, "message": f"Refresh failed: {exc}"}
             finally:
                 self.server.refresh_lock.release()
+            if result.get("ok"):
+                self.server.last_build = result
             self._send_json(200 if result.get("ok") else 500, result)
             return
 
@@ -239,6 +356,7 @@ def serve_dashboard(engine, open_browser=True):
     root = Path(engine.SCREENSHOTS_PATH).resolve()
     handler = partial(DashboardRequestHandler, directory=str(root))
     server = DashboardHTTPServer(("127.0.0.1", 0), handler, engine, root)
+    server.last_build = result
     port = server.server_address[1]
     url = f"http://127.0.0.1:{port}/"
 

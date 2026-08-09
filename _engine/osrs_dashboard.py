@@ -27,6 +27,7 @@ from urllib.error import URLError
 from economic_value import resolve_economic_value
 from value_recipes import VALUE_RECIPES
 from wiki_discovery import refresh_catalog
+from version import APP_VERSION, ISSUES_URL, NEW_ISSUE_URL
 
 # ─────────────────────────────────────────────────────────────────────
 #  CONFIG — set these for your character. Loaded from config.py if present,
@@ -4350,6 +4351,137 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
     margin-top: 16px;
   }}
 
+  /* Feedback lives in the navigation rail, which is always on screen, so
+     reporting something never depends on scrolling to the bottom of a long
+     page. Hidden entirely unless the local service is running: a statically
+     opened HTML file cannot gather diagnostics, and a Report Issue button
+     that files a report with no version in it is worse than no button. */
+  .rail-foot {{ margin-top: auto; }}
+  .rail-feedback {{ display: none; flex-direction: column; gap: 2px; padding: 11px 0 2px; border-top: 1px solid #342a18; }}
+  .rail-feedback.ready {{ display: flex; }}
+  .rail-fb-btn {{
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    width: 100%;
+    height: 30px;
+    padding: 0 11px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 2px;
+    color: var(--text-dim);
+    font: 600 9px 'Cinzel', serif;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    text-align: left;
+    cursor: pointer;
+    transition: 0.16s ease;
+  }}
+  .rail-fb-btn:hover {{ color: var(--gold-bright); background: #18150e; border-color: #3f331e; }}
+  .rail-fb-btn svg {{ width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; flex: none; }}
+
+  .feedback-btn {{
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    height: 32px;
+    padding: 0 13px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    font: 600 9px 'Cinzel', serif;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s;
+  }}
+  .feedback-btn:hover {{ border-color: var(--gold-dim); color: var(--gold-bright); }}
+
+  .fb-modal {{
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    background: rgba(4, 3, 1, 0.82);
+    padding: 24px;
+    overflow-y: auto;
+  }}
+  .fb-modal.open {{ display: block; }}
+  .fb-panel {{
+    max-width: 620px;
+    margin: 48px auto;
+    background: var(--bg-card);
+    border: 1px solid var(--border-bright);
+    padding: 22px 24px 24px;
+  }}
+  .fb-panel h3 {{
+    font-family: 'Cinzel', serif;
+    font-size: 0.95rem;
+    color: var(--gold-bright);
+    letter-spacing: 1px;
+    margin: 0 0 6px;
+  }}
+  .fb-lede {{ color: var(--text-dim); font-size: 0.76rem; margin: 0 0 16px; line-height: 1.5; }}
+  .fb-field {{ margin-bottom: 14px; }}
+  .fb-field label {{
+    display: block;
+    font: 600 9px 'Cinzel', serif;
+    letter-spacing: 0.7px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 5px;
+  }}
+  .fb-field input, .fb-field textarea {{
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'Crimson Text', Georgia, serif;
+    font-size: 0.88rem;
+    padding: 8px 10px;
+    box-sizing: border-box;
+  }}
+  .fb-field textarea {{ min-height: 132px; resize: vertical; line-height: 1.5; }}
+  .fb-field input:focus, .fb-field textarea:focus {{ outline: none; border-color: var(--gold-dim); }}
+  .fb-diag {{
+    background: var(--bg);
+    border: 1px solid var(--border);
+    padding: 9px 11px;
+    color: var(--text-dim);
+    font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+    font-size: 0.7rem;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }}
+  .fb-actions {{ display: flex; justify-content: flex-end; gap: 9px; margin-top: 18px; }}
+  .fb-actions .feedback-btn {{ height: 34px; }}
+  .fb-actions .fb-primary {{
+    background: #1c160a;
+    border-color: var(--border-bright);
+    color: var(--gold-bright);
+  }}
+  .fb-actions .fb-primary:hover {{ border-color: var(--gold); }}
+  .fb-note {{ color: var(--text-dim); font-size: 0.72rem; margin: 14px 0 0; line-height: 1.5; }}
+
+  .fb-release {{ border-top: 1px solid var(--border); padding-top: 14px; margin-top: 14px; }}
+  .fb-release:first-of-type {{ border-top: none; padding-top: 0; margin-top: 0; }}
+  .fb-release-head {{ display: flex; align-items: baseline; gap: 9px; flex-wrap: wrap; }}
+  .fb-release-tag {{ font: 600 0.82rem 'Cinzel', serif; color: var(--gold-bright); letter-spacing: 0.5px; }}
+  .fb-release-date {{ color: var(--text-dim); font-size: 0.72rem; }}
+  .fb-release-current {{
+    font: 600 8px 'Cinzel', serif; letter-spacing: 0.6px; text-transform: uppercase;
+    color: var(--gold); border: 1px solid var(--gold-dim); padding: 1px 6px;
+  }}
+  .fb-release-notes {{
+    color: var(--text-muted); font-size: 0.82rem; line-height: 1.6;
+    margin: 7px 0 0; white-space: pre-wrap; word-break: break-word;
+  }}
+
+  @media (max-width: 760px) {{
+    .fb-panel {{ margin: 16px auto; padding: 18px; }}
+  }}
+
   @media (max-width: 900px) {{
     .grid-2, .grid-3 {{ grid-template-columns: 1fr; }}
     .pulse-header {{ flex-direction: column; }}
@@ -4377,7 +4509,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   #side-rail .nav-item svg, .menu-btn svg, .refresh-btn svg {{ width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; flex:none; }}
   #side-rail .nav-item:hover {{ color:var(--text); background:#18150e; border-color:#3f331e; }}
   #side-rail .nav-item.active {{ color:var(--gold-bright); background:linear-gradient(90deg,#2a210d,#18150e); border-color:#76591c; box-shadow:inset 3px 0 0 var(--gold-bright); }}
-  .rail-state {{ margin-top:auto; padding:13px 7px 0; border-top:1px solid #342a18; display:flex; gap:9px; align-items:flex-start; }}
+  .rail-state {{ padding:13px 7px 0; border-top:1px solid #342a18; display:flex; gap:9px; align-items:flex-start; }}
   .rail-state-dot {{ width:7px; height:7px; border-radius:50%; background:#79a780; box-shadow:0 0 0 3px rgba(121,167,128,.12); margin-top:4px; flex:none; }}
   .rail-state strong,.rail-state span {{ display:block; }}
   .rail-state strong {{ font:600 8px 'Cinzel',serif; color:var(--text); letter-spacing:.35px; text-transform:uppercase; }}
@@ -4791,6 +4923,9 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   <symbol id="i-chronicle" viewBox="0 0 24 24"><path d="M5 4h12a2 2 0 0 1 2 2v14H7a2 2 0 0 1-2-2V4Zm2 0v16M10 8h6m-6 4h6m-6 4h4"/></symbol>
   <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M19 8a8 8 0 1 0 1 7M19 8V3m0 5h-5"/></symbol>
   <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+  <symbol id="i-report" viewBox="0 0 24 24"><path d="M12 4 2 20h20L12 4Zm0 6v5m0 3v.5"/></symbol>
+  <symbol id="i-idea" viewBox="0 0 24 24"><path d="M9 18h6m-5 3h4M12 2a6 6 0 0 0-3.5 10.9V15h7v-2.1A6 6 0 0 0 12 2Z"/></symbol>
+  <symbol id="i-sparkle" viewBox="0 0 24 24"><path d="m12 3 2 5.5L19.5 10 14 12l-2 5.5L10 12 4.5 10 10 8.5 12 3Zm6.5 8.5.9 2.3 2.3.9-2.3.9-.9 2.3-.9-2.3-2.3-.9 2.3-.9.9-2.3Z"/></symbol>
 </svg>
 
 <aside id="side-rail" aria-label="Dashboard pages">
@@ -4804,7 +4939,14 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
     <button class="nav-item" onclick="switchPage('gallery', this)"><svg><use href="#i-gallery"/></svg><span>Gallery</span></button>
     <button class="nav-item" onclick="switchPage('chronicle', this)"><svg><use href="#i-chronicle"/></svg><span>Chronicle</span></button>
   </div>
-  <div class="rail-state"><span class="rail-state-dot"></span><div><strong>Local dashboard</strong><span>Loopback only</span></div></div>
+  <div class="rail-foot">
+    <div class="rail-feedback" id="rail-feedback">
+      <button class="rail-fb-btn" onclick="openReportDialog()"><svg><use href="#i-report"/></svg><span>Report an issue</span></button>
+      <button class="rail-fb-btn" onclick="openFeatureDialog()"><svg><use href="#i-idea"/></svg><span>Request a feature</span></button>
+      <button class="rail-fb-btn" onclick="openWhatsNew()"><svg><use href="#i-sparkle"/></svg><span>What&#39;s new</span></button>
+    </div>
+    <div class="rail-state"><span class="rail-state-dot"></span><div><strong>Local dashboard</strong><span>Loopback only</span></div></div>
+  </div>
 </aside>
 <div class="nav-scrim" id="nav-scrim" onclick="closeNavigation()"></div>
 
@@ -5094,6 +5236,33 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   <div class="lb-info" id="lb-info"></div>
   <button class="favorite-heart lb-favorite" id="lb-favorite" style="display:none" onclick="toggleLightboxFavorite(event)" aria-label="Favorite screenshot">&#9825;</button>
   <button class="lb-nav lb-next" onclick="lbNav(1)">›</button>
+</div>
+
+<div class="fb-modal" id="fb-modal" onclick="dismissFeedbackModal(event)">
+  <div class="fb-panel" id="fb-panel" role="dialog" aria-modal="true" aria-labelledby="fb-title">
+    <h3 id="fb-title"></h3>
+    <p class="fb-lede" id="fb-lede"></p>
+    <div id="fb-form">
+      <div class="fb-field">
+        <label for="fb-subject">Summary</label>
+        <input type="text" id="fb-subject" maxlength="120" autocomplete="off">
+      </div>
+      <div class="fb-field">
+        <label for="fb-detail" id="fb-detail-label">Details</label>
+        <textarea id="fb-detail" maxlength="4000"></textarea>
+      </div>
+      <div class="fb-field">
+        <label>Included automatically</label>
+        <div class="fb-diag" id="fb-diag"></div>
+      </div>
+      <p class="fb-note">This opens GitHub with the form already filled in. Nothing is sent until you press Submit there, and you can edit anything first. No account name, file path, or screenshot leaves your machine.</p>
+    </div>
+    <div id="fb-releases"></div>
+    <div class="fb-actions">
+      <button class="feedback-btn" onclick="closeFeedbackModal()">Close</button>
+      <button class="feedback-btn fb-primary" id="fb-submit" onclick="submitFeedback()">Continue to GitHub</button>
+    </div>
+  </div>
 </div>
 
 <footer>Generated by osrs_dashboard.py · {PLAYER_NAME} · {datetime.now().strftime("%B %d, %Y")}</footer>
@@ -5414,6 +5583,9 @@ const GALLERY_BATCH_SIZE = 72;
 let galleryVisibleCount = GALLERY_BATCH_SIZE;
 let appInteractive = false;
 let favoritePaths = new Set();
+let appDiagnostics = {{}};
+let feedbackMode = null;
+const NEW_ISSUE_URL = '{NEW_ISSUE_URL}';
 
 function openHomeMoment(idx) {{
   lbItems = HOME_MOMENTS;
@@ -5470,6 +5642,8 @@ async function initializeDashboardApp() {{
     if (appInteractive) {{
       document.getElementById('app-controls').classList.add('ready');
       document.getElementById('favorites-filter').style.display = '';
+      appDiagnostics = status.diagnostics || {{}};
+      document.getElementById('rail-feedback').classList.add('ready');
       const favoritesResponse = await fetch('/api/favorites', {{cache: 'no-store'}});
       if (favoritesResponse.ok) {{
         const payload = await favoritesResponse.json();
@@ -5484,6 +5658,168 @@ async function initializeDashboardApp() {{
   filterGallery();
   renderFavoriteShowcase();
 }}
+
+// ── Feedback bar ────────────────────────────────────────────────────
+// Report Issue and Request Feature hand off to GitHub with the form already
+// filled in. Deliberately no API call and no token: the user signs in and
+// presses Submit themselves, so nothing is ever posted on their behalf.
+
+function diagnosticsLines() {{
+  const d = appDiagnostics || {{}};
+  const shots = (typeof d.screenshots === 'number') ? d.screenshots.toLocaleString() : 'unknown';
+  let hiscores = 'unknown';
+  if (d.hiscores_ok === true) hiscores = 'reachable';
+  else if (d.hiscores_ok === false) hiscores = 'unreachable at last build';
+  return [
+    'Dashboard version: ' + (d.version || 'unknown'),
+    'Running as: ' + (d.packaged ? 'packaged executable' : 'source (Python ' + (d.python || '?') + ')'),
+    'Operating system: ' + (d.os || 'unknown'),
+    'Screenshots scanned: ' + shots,
+    'Hiscores: ' + hiscores,
+    'Dashboard last built: ' + (d.built_at || 'unknown')
+  ];
+}}
+
+function openFeedbackDialog(mode) {{
+  // At narrow widths the rail is a drawer over the page; the button that was
+  // just tapped lives inside it, so dismiss it before the dialog opens.
+  closeNavigation();
+  feedbackMode = mode;
+  const isBug = mode === 'bug';
+  document.getElementById('fb-title').textContent = isBug ? 'Report an issue' : 'Request a feature';
+  document.getElementById('fb-lede').textContent = isBug
+    ? 'Describe what happened and what you expected instead. Details about your setup are attached for you.'
+    : 'Describe what you would like the dashboard to do, and what it would help you see or track.';
+  document.getElementById('fb-detail-label').textContent = isBug
+    ? 'What happened'
+    : 'What you would like';
+  document.getElementById('fb-subject').value = '';
+  document.getElementById('fb-detail').value = '';
+  document.getElementById('fb-diag').textContent = diagnosticsLines().join('\\n');
+  document.getElementById('fb-form').style.display = '';
+  document.getElementById('fb-releases').style.display = 'none';
+  const submit = document.getElementById('fb-submit');
+  submit.style.display = '';
+  submit.textContent = 'Continue to GitHub';
+  document.getElementById('fb-modal').classList.add('open');
+  document.getElementById('fb-subject').focus();
+}}
+
+function openReportDialog() {{ openFeedbackDialog('bug'); }}
+function openFeatureDialog() {{ openFeedbackDialog('feature'); }}
+
+function closeFeedbackModal() {{
+  document.getElementById('fb-modal').classList.remove('open');
+  feedbackMode = null;
+}}
+
+function dismissFeedbackModal(event) {{
+  // Only a click on the backdrop itself closes; clicks inside the panel bubble
+  // up here too and must not discard what the user has typed.
+  if (event.target && event.target.id === 'fb-modal') closeFeedbackModal();
+}}
+
+function submitFeedback() {{
+  if (!feedbackMode) return;
+  const isBug = feedbackMode === 'bug';
+  const subject = document.getElementById('fb-subject').value.trim();
+  const detail = document.getElementById('fb-detail').value.trim();
+  if (!subject) {{
+    document.getElementById('fb-subject').focus();
+    return;
+  }}
+  const heading = isBug ? 'What happened' : 'What I would like';
+  const body = [
+    '### ' + heading,
+    '',
+    detail || '(not described)',
+    '',
+    '### Setup',
+    '',
+    diagnosticsLines().map(line => '- ' + line).join('\\n'),
+    '',
+    '_Filed from the dashboard._'
+  ].join('\\n');
+  const params = new URLSearchParams({{
+    title: (isBug ? '[Bug] ' : '[Feature] ') + subject,
+    body: body
+  }});
+  window.open(NEW_ISSUE_URL + '?' + params.toString(), '_blank', 'noopener');
+  closeFeedbackModal();
+}}
+
+async function openWhatsNew() {{
+  closeNavigation();
+  document.getElementById('fb-title').textContent = 'What' + String.fromCharCode(39) + 's new';
+  document.getElementById('fb-lede').textContent = 'Recent releases and what changed in each.';
+  document.getElementById('fb-form').style.display = 'none';
+  document.getElementById('fb-submit').style.display = 'none';
+  const holder = document.getElementById('fb-releases');
+  holder.style.display = '';
+  holder.textContent = 'Loading...';
+  document.getElementById('fb-modal').classList.add('open');
+  let payload = null;
+  try {{
+    const response = await fetch('/api/releases', {{cache: 'no-store'}});
+    if (response.ok) payload = await response.json();
+  }} catch (_error) {{ /* offline is an ordinary outcome, not an error state */ }}
+  renderReleases(holder, payload);
+}}
+
+function renderReleases(holder, payload) {{
+  holder.textContent = '';
+  const releases = (payload && payload.releases) || [];
+  if (!releases.length) {{
+    const note = document.createElement('p');
+    note.className = 'fb-note';
+    note.textContent = 'Release notes are not available right now. They need a connection the first time, and are kept on disk after that.';
+    holder.appendChild(note);
+    return;
+  }}
+  const current = (payload && payload.current) || '';
+  releases.forEach(release => {{
+    const wrap = document.createElement('div');
+    wrap.className = 'fb-release';
+    const head = document.createElement('div');
+    head.className = 'fb-release-head';
+    const tag = document.createElement('span');
+    tag.className = 'fb-release-tag';
+    tag.textContent = release.name || release.tag || 'Release';
+    head.appendChild(tag);
+    if (release.published_at) {{
+      const date = document.createElement('span');
+      date.className = 'fb-release-date';
+      date.textContent = release.published_at;
+      head.appendChild(date);
+    }}
+    if (current && release.tag && release.tag.replace(/^v/i, '') === current) {{
+      const badge = document.createElement('span');
+      badge.className = 'fb-release-current';
+      badge.textContent = 'You have this';
+      head.appendChild(badge);
+    }}
+    wrap.appendChild(head);
+    if (release.notes) {{
+      const notes = document.createElement('p');
+      notes.className = 'fb-release-notes';
+      notes.textContent = release.notes.trim();
+      wrap.appendChild(notes);
+    }}
+    holder.appendChild(wrap);
+  }});
+  if (payload && payload.stale) {{
+    const note = document.createElement('p');
+    note.className = 'fb-note';
+    note.textContent = 'Showing the last notes saved to this machine. There may be newer ones.';
+    holder.appendChild(note);
+  }}
+}}
+
+document.addEventListener('keydown', event => {{
+  if (event.key === 'Escape' && document.getElementById('fb-modal').classList.contains('open')) {{
+    closeFeedbackModal();
+  }}
+}});
 
 async function refreshDashboard() {{
   if (!appInteractive) return;
@@ -6545,6 +6881,9 @@ def generate_dashboard():
         "message": f"Refreshed {data['total']:,} screenshots.",
         "screenshots": data["total"],
         "favorites": len(favorite_paths),
+        # Reported in in-app issue reports so a bug filed during a hiscores
+        # outage is recognisable as one without a round of questions.
+        "hiscores": bool(hiscores.get("skills")),
         "indirect_value": economic_value.get("realized_total", 0),
         "pending_value": economic_value.get("latent_total", 0),
         "generated_at": datetime.now().isoformat(timespec="seconds"),
