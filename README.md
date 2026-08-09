@@ -80,6 +80,20 @@ The engine scans filenames and image content in the RuneLite screenshot folder t
 
 Wealth tracking only counts items with clear evidence and a resolvable price. Incomplete item builds are shown separately from realized value rather than folded into it.
 
+## Troubleshooting
+
+**Nothing appears when I run it.** Check `dashboard_log.txt` next to your screenshots. If that file doesn't exist either, the app failed before it could find your screenshot folder — open an issue and say what happened.
+
+**Charts are empty.** Your hiscores couldn't be reached, either because the name isn't on the hiscores yet or the network is down. Everything built from screenshots still works.
+
+**Bosses I've killed aren't showing up.** RuneLite only saves screenshots for valuable drops, untradeables, collection log entries, and combat achievements, and only with the relevant plugin settings enabled. Anything it never screenshotted can't appear.
+
+**Wealth says prices are unavailable.** The public price feed couldn't be reached and there's no saved quote yet. Nothing is lost; refresh again later and the value resolves.
+
+**A boss is showing items that aren't its own.** Some items drop from several bosses and can't be attributed from a filename alone. Items on four or more drop tables are grouped automatically; if one slips through, open an issue with the boss and item.
+
+**It's building the wrong character.** Open **Settings** in the sidebar and switch. It applies the next time you start the app.
+
 ## Feedback
 
 Bug reports and ideas are welcome through [Issues](../../issues).

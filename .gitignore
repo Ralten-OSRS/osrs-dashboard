@@ -10,7 +10,11 @@ __pycache__/
 _Archive/
 Distribution/_Archive/
 Distribution/_build/
-Distribution/Clan Package/OSRS Dashboard.exe
+# The whole package folder is build output now. Releases is the distribution
+# channel, so nothing in here is worth versioning: the exe is attached to a
+# release and the README that used to ship beside it had no reader once people
+# started downloading a single file rather than a folder.
+Distribution/Clan Package/
 
 # Workspace operating files. These describe how the project is worked on
 # rather than how the dashboard works, and they stay on the local machine.
@@ -19,14 +23,11 @@ CLAUDE.md
 MEMORY.md
 DESIGN.md
 
-# Internal design material: the redesign specification, approved mockups,
-# and the isolated prototype with its screenshot fixtures.
+# Resources now holds runtime assets only — the pinned Chart.js and the fonts
+# embedded into every generated dashboard. Design records moved to
+# _Archive/Redesign 2026-08/, which is already ignored, so the per-file rules
+# that used to live here are gone.
 OSRS Dashboard Resources/.gitkeep
-OSRS Dashboard Resources/*.png
-OSRS Dashboard Resources/OSRS Dashboard Redesign Definition.md
-OSRS Dashboard Resources/OSRS Dashboard Redesign Definition.docx
-OSRS Dashboard Resources/Redesign Prototype/
-OSRS Dashboard Resources/Beta Dashboard Implementation/
 
 # This repository is the source of truth for the code, so the copied source
 # folder that used to ship inside the clan package is retired.
