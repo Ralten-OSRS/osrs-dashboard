@@ -62,7 +62,7 @@ If you'd rather run the Python directly:
 
 The launcher takes `--pick` to choose a different character and `--refresh-boss-data` to re-read the wiki before building.
 
-Two other scripts are included. `2 - Update Drop Tables.bat` refreshes boss drop tables, rates, and Combat Achievement data from the OSRS Wiki. `3 - Audit Shared Drops.bat` is a diagnostic for items that appear on several drop tables.
+`_engine/` holds two maintainer scripts you will not normally need — a wiki refresh of the bundled drop tables, and a diagnostic for items that drop from several bosses. See `READ ME - maintainer tools.txt` there for when each is worth running.
 
 All Python lives in `_engine/`. The fonts and Chart.js in `OSRS Dashboard Resources/` are embedded into the generated page so it renders with no network connection.
 
