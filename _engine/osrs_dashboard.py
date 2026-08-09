@@ -5808,7 +5808,7 @@ function renderSettings(holder, data) {{
       const button = document.createElement('button');
       button.className = 'feedback-btn';
       button.textContent = 'Switch to ' + name;
-      button.onclick = () => switchCharacter(name, account);
+      button.onclick = () => switchCharacter(name, account, data.current);
       picker.appendChild(button);
     }});
     account.appendChild(picker);
@@ -5842,11 +5842,22 @@ function renderSettings(holder, data) {{
   files.appendChild(filesNote);
 }}
 
-async function switchCharacter(name, container) {{
-  const note = document.createElement('p');
-  note.className = 'fb-note';
+function switchNote(container) {{
+  // One note per panel, reused. Appending a fresh one per click stacked them
+  // up and left contradictory messages on screen at the same time.
+  let note = container.querySelector('.switch-note');
+  if (!note) {{
+    note = document.createElement('p');
+    note.className = 'fb-note switch-note';
+    container.appendChild(note);
+  }}
+  note.textContent = '';
+  return note;
+}}
+
+async function switchCharacter(name, container, previous) {{
+  const note = switchNote(container);
   note.textContent = 'Saving...';
-  container.appendChild(note);
   try {{
     const response = await fetch('/api/settings/character', {{
       method: 'POST',
@@ -5863,11 +5874,41 @@ async function switchCharacter(name, container) {{
         response.status + '). Check your log file for details.';
       return;
     }}
-    note.textContent = result.ok
-      ? (result.restart_required
-          ? name + ' will be used next time. Close this window and open the dashboard again to switch.'
-          : 'Already showing ' + name + '.')
-      : (result.message || 'That did not work.');
+    if (!result.ok) {{
+      note.textContent = result.message || 'That did not work.';
+      return;
+    }}
+    if (!result.restart_required) {{
+      note.textContent = 'Already showing ' + name + '.';
+      return;
+    }}
+    note.textContent = name + ' will be used next time. Close this window and open the dashboard again to switch. ';
+    // Switching writes immediately, so a misclick needs a way back. Offering
+    // an undo afterwards keeps the common case one click, where a confirm
+    // step would tax everyone to protect the occasional slip.
+    if (previous && previous !== name) {{
+      const undo = document.createElement('button');
+      undo.className = 'feedback-btn';
+      undo.style.marginLeft = '4px';
+      undo.textContent = 'Keep ' + previous + ' instead';
+      undo.onclick = async () => {{
+        undo.disabled = true;
+        try {{
+          const back = await fetch('/api/settings/character', {{
+            method: 'POST',
+            headers: {{'Content-Type': 'application/json'}},
+            body: JSON.stringify({{character: previous}})
+          }});
+          const undone = await back.json();
+          note.textContent = undone.ok
+            ? 'Staying on ' + previous + '. Nothing will change.'
+            : (undone.message || 'Could not undo that.');
+        }} catch (_undoError) {{
+          note.textContent = 'Could not reach the local service to undo that.';
+        }}
+      }};
+      note.appendChild(undo);
+    }}
   }} catch (_error) {{
     note.textContent = 'Could not reach the local service. It may have stopped; check your log file.';
   }}
