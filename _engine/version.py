@@ -11,7 +11,7 @@ value tells users they are current when they are not, and now also stamps the
 wrong build onto every issue they file.
 """
 
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.1.0"
 
 REPO = "Ralten-OSRS/osrs-dashboard"
 REPO_URL = f"https://github.com/{REPO}"
