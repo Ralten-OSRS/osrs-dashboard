@@ -132,6 +132,130 @@ poll();
 """.replace("ISSUES_URL_PLACEHOLDER", ISSUES_URL)
 
 
+# Shown on a first run, when no character has been chosen yet. This is what
+# removing the console window depends on: without it a packaged first run has
+# no way to ask, and a new user's double-click does nothing at all.
+SETUP_PAGE = """<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Choose your character</title>
+<style>
+  :root { --gold:#c8a45a; --gold-bright:#f0c040; --bg:#0a0804; --card:#120e08;
+          --border:#3a2d18; --bright:#6a4f28; --text:#d4c4a0; --dim:#8f7d5e; --red:#c96a5a; }
+  * { box-sizing:border-box; }
+  body { margin:0; min-height:100vh; display:grid; place-items:center; padding:24px;
+         background:var(--bg); color:var(--text); font-family:Georgia,'Times New Roman',serif; }
+  .wrap { width:min(560px,100%); }
+  h1 { margin:0 0 6px; font-size:1.4rem; color:var(--gold-bright); font-weight:600; letter-spacing:.5px; }
+  .sub { margin:0 0 20px; color:var(--dim); font-size:.9rem; line-height:1.5; }
+  .card { background:var(--card); border:1px solid var(--border); padding:8px; }
+  button.pick { display:flex; align-items:center; justify-content:space-between; width:100%;
+    padding:13px 14px; margin:0; background:transparent; border:1px solid transparent;
+    color:var(--text); font-family:inherit; font-size:1rem; text-align:left; cursor:pointer; }
+  button.pick:hover { background:#18150e; border-color:#3f331e; color:var(--gold-bright); }
+  button.pick span { color:var(--dim); font-size:.78rem; }
+  button.pick:disabled { opacity:.5; cursor:wait; }
+  .manual { margin-top:18px; }
+  .manual label { display:block; font-size:.8rem; color:var(--dim); margin-bottom:6px; }
+  .row { display:flex; gap:8px; }
+  input { flex:1; background:var(--bg); border:1px solid var(--border); color:var(--text);
+          font-family:inherit; font-size:.9rem; padding:9px 10px; }
+  input:focus { outline:none; border-color:var(--gold); }
+  .go { padding:0 16px; background:#1c160a; border:1px solid var(--bright); color:var(--gold-bright);
+        font-family:inherit; font-size:.85rem; cursor:pointer; }
+  .go:hover { border-color:var(--gold); }
+  .err { color:var(--red); font-size:.84rem; margin:12px 0 0; min-height:1em; }
+  .hint { color:var(--dim); font-size:.8rem; margin:16px 0 0; line-height:1.55; }
+</style></head>
+<body><div class="wrap">
+  <h1>Choose your character</h1>
+  <p class="sub" id="sub">Loading...</p>
+  <div class="card" id="list" style="display:none"></div>
+  <div class="manual" id="manual" style="display:none">
+    <label for="path">Or paste the full path to your character&#39;s screenshot folder</label>
+    <div class="row">
+      <input id="path" type="text" spellcheck="false" placeholder="C:\\Users\\you\\.runelite\\screenshots\\YourName">
+      <button class="go" onclick="submitPath()">Use this</button>
+    </div>
+  </div>
+  <p class="err" id="err"></p>
+  <p class="hint" id="hint"></p>
+</div>
+<script>
+var errEl = document.getElementById('err');
+
+async function load() {
+  var data;
+  try {
+    data = await (await fetch('/api/setup', {cache:'no-store'})).json();
+  } catch (e) {
+    document.getElementById('sub').textContent = 'Could not reach the local service.';
+    return;
+  }
+  var list = document.getElementById('list');
+  var chars = data.characters || [];
+  if (chars.length) {
+    document.getElementById('sub').textContent =
+      'These are the characters RuneLite has saved screenshots for. This is remembered, so you only pick once.';
+    chars.forEach(function (name) {
+      var b = document.createElement('button');
+      b.className = 'pick';
+      b.innerHTML = '';
+      b.appendChild(document.createTextNode(name));
+      var s = document.createElement('span');
+      s.textContent = 'Use this';
+      b.appendChild(s);
+      b.onclick = function () { choose({folder: name}, b); };
+      list.appendChild(b);
+    });
+    list.style.display = '';
+    document.getElementById('hint').textContent =
+      'Wrong one? You can change it later under Settings in the dashboard.';
+  } else {
+    document.getElementById('sub').textContent = data.base_exists
+      ? 'No character folders with screenshots were found in ' + data.base + '.'
+      : 'RuneLite\\u2019s screenshots folder was not in the usual place.';
+    document.getElementById('hint').textContent =
+      'In RuneLite, the screenshot location is shown in the Screenshot plugin settings.';
+  }
+  document.getElementById('manual').style.display = '';
+}
+
+async function choose(body, button) {
+  errEl.textContent = '';
+  if (button) { button.disabled = true; }
+  var result;
+  try {
+    var r = await fetch('/api/setup', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body)
+    });
+    result = await r.json();
+  } catch (e) {
+    errEl.textContent = 'Could not reach the local service.';
+    if (button) { button.disabled = false; }
+    return;
+  }
+  if (result.ok) { window.location.replace('/'); return; }
+  errEl.textContent = result.message || 'That did not work.';
+  if (button) { button.disabled = false; }
+}
+
+function submitPath() {
+  var value = document.getElementById('path').value.trim();
+  if (!value) { document.getElementById('path').focus(); return; }
+  choose({path: value}, null);
+}
+
+document.getElementById('path').addEventListener('keydown', function (e) {
+  if (e.key === 'Enter') submitPath();
+});
+load();
+</script></body></html>
+"""
+
+
 class DashboardHTTPServer(ThreadingHTTPServer):
     daemon_threads = True
 
@@ -152,6 +276,18 @@ class DashboardHTTPServer(ThreadingHTTPServer):
         self.last_build = {}
         self.build_state = {"state": "building", "message": ""}
         self.build_lock = threading.Lock()
+        # Set when the service comes up before a character has been chosen.
+        # on_account_chosen is supplied by the launcher and binds the engine.
+        self.setup_base = None
+        self.on_account_chosen = None
+
+    def set_build_setup(self):
+        with self.build_lock:
+            self.build_state = {"state": "setup", "message": ""}
+
+    def set_build_building(self):
+        with self.build_lock:
+            self.build_state = {"state": "building", "message": ""}
 
     def set_build_ready(self):
         with self.build_lock:
@@ -205,6 +341,17 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
 
     def log_message(self, _format, *_args):
         return
+
+    def translate_path(self, path):
+        """Resolve static files against the server's current root.
+
+        SimpleHTTPRequestHandler normally captures a directory at construction.
+        Reading it from the server instead means the root can change once, when
+        a first-run user picks their character, without restarting the service
+        or moving them to a different port.
+        """
+        self.directory = str(self.server.root)
+        return super().translate_path(path)
 
     def _send_json(self, status, payload):
         body = json.dumps(payload).encode("utf-8")
@@ -429,6 +576,23 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             with self.server.releases_lock:
                 self._send_json(200, self._releases_payload())
             return
+        if route == "/api/setup":
+            base = self.server.setup_base
+            found = []
+            if base is not None:
+                try:
+                    for entry in sorted(Path(base).iterdir(), key=lambda p: p.name.lower()):
+                        if entry.is_dir() and next(entry.rglob("*.png"), None) is not None:
+                            found.append(entry.name)
+                except OSError:
+                    pass
+            self._send_json(200, {
+                "ok": True,
+                "base": str(base) if base else "",
+                "base_exists": bool(base and Path(base).is_dir()),
+                "characters": found,
+            })
+            return
         if route == "/api/settings":
             self._send_json(200, self._settings_payload())
             return
@@ -452,7 +616,17 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             # the state means a returning user with a dashboard already on disk
             # never sees a progress screen they do not need.
             target = self.server.root / "osrs_dashboard.html"
-            if self.server.get_build_state()["state"] == "ready" and target.is_file():
+            state = self.server.get_build_state()["state"]
+            if state == "setup":
+                body = SETUP_PAGE.encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                self.wfile.write(body)
+                return
+            if state == "ready" and target.is_file():
                 self.path = "/osrs_dashboard.html"
             else:
                 body = BUILDING_PAGE.encode("utf-8")
@@ -523,6 +697,42 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             self._send_json(200, {"ok": True, "favorite": favorite, "count": len(favorites)})
             return
 
+        if route == "/api/setup":
+            if self.server.get_build_state()["state"] != "setup":
+                self._send_json(409, {"ok": False, "message": "Setup has already finished."})
+                return
+            base = self.server.setup_base
+            folder = payload.get("folder")
+            raw_path = payload.get("path")
+            target = None
+            if isinstance(folder, str) and folder.strip() and base is not None:
+                # A name from the list we ourselves produced: confirm it is a
+                # real child of the base rather than trusting the round trip.
+                if folder not in (".", "..") and "/" not in folder and "\\" not in folder:
+                    candidate = Path(base) / folder
+                    if candidate.is_dir():
+                        target = candidate
+            elif isinstance(raw_path, str) and raw_path.strip():
+                # Typed by the user because auto-detection found nothing. This
+                # is the one place an arbitrary path is legitimate: they are
+                # naming their own screenshot folder on their own machine.
+                candidate = Path(raw_path.strip().strip('"'))
+                if candidate.is_dir():
+                    target = candidate
+            if target is None:
+                self._send_json(400, {"ok": False, "message": "That folder could not be found."})
+                return
+            target = target.resolve()
+            try:
+                self.server.on_account_chosen(target)
+            except Exception as exc:  # noqa: BLE001 - report instead of dying
+                import traceback
+                traceback.print_exc()
+                self._send_json(500, {"ok": False, "message": f"{type(exc).__name__}: {exc}"})
+                return
+            self._send_json(200, {"ok": True, "character": target.name})
+            return
+
         if route == "/api/settings/character":
             import settings as user_settings
 
@@ -571,7 +781,8 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         self._send_json(404, {"ok": False, "message": "Not found."})
 
 
-def serve_dashboard(engine, open_browser=True, build_first=True):
+def serve_dashboard(engine, open_browser=True, build_first=True,
+                    setup_base=None, on_account_chosen=None):
     """Serve immediately, then build, so the browser is the interface throughout.
 
     The old order was build-then-serve, which meant a full screenshot scan of
@@ -597,11 +808,37 @@ def serve_dashboard(engine, open_browser=True, build_first=True):
         server.build_state = {"state": "ready", "message": ""}
         return _run_server(server, url, open_browser)
 
+    if setup_base is not None:
+        # Nothing remembered: come up in setup and let the browser ask. This
+        # is what allows the console window to go away, since a packaged first
+        # run otherwise has no way to put the question anywhere.
+        chosen = threading.Event()
+        server.setup_base = Path(setup_base)
+        server.set_build_setup()
+
+        def account_chosen(path):
+            on_account_chosen(path)
+            server.root = Path(engine.SCREENSHOTS_PATH).resolve()
+            server.set_build_building()
+            chosen.set()
+
+        server.on_account_chosen = account_chosen
+
     serving = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.25}, daemon=True)
     serving.start()
     print(f"\nInteractive dashboard is running locally.\n  {url}\n")
     if open_browser:
         webbrowser.open(url)
+
+    if setup_base is not None:
+        print("Waiting for a character to be chosen in your browser...")
+        while not chosen.is_set():
+            if not serving.is_alive():
+                # The window was closed before anything was picked.
+                server.server_close()
+                print("No character chosen. Nothing was built.")
+                return None
+            chosen.wait(timeout=0.25)
 
     try:
         result = engine.generate_dashboard()
