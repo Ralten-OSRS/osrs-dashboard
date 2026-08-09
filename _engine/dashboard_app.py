@@ -211,15 +211,43 @@ def run():
     eng.ECONOMIC_EVENTS_FILE = str(path / "economic_events.json")
     eng.VALUE_PRICE_CACHE_FILE = str(path / "value_price_cache.json")
     eng.WIKI_DISCOVERY_CATALOG_FILE = str(path / "wiki_discovery_catalog.json")
-    # Hard-reset every personalization knob to neutral. Engine defaults are
-    # already neutral, but if a stray config.py ever gets bundled into the
-    # exe (or found on the user's machine), this guarantees no one inherits
+    # Hard-reset every personalization knob to neutral, so nobody inherits
     # someone else's manual settings or attested loot.
-    eng.ACTIVE_SKILLS = []
-    eng.LUCK_OWNED_OVERRIDES = {}
-    eng.VALUE_COMPONENT_OVERRIDES = {}
+    #
+    # This keys off being packaged rather than off which script was launched.
+    # The exe is the only artefact that ships, and `sys.frozen` is always true
+    # there, so the reset always runs for every distributed copy — the exact
+    # protection DESIGN.md non-negotiable #10 asks for, tied to the condition
+    # that actually matters instead of to an entry point.
+    #
+    # Running from source deliberately keeps `config.py`. That is what the
+    # README documents config.py for, it is how the engine already behaved
+    # when run directly, and it lets the maintainer use the same launcher as
+    # everyone else rather than maintaining a private path that hides
+    # user-facing problems.
+    if getattr(sys, "frozen", False):
+        eng.ACTIVE_SKILLS = []
+        eng.LUCK_OWNED_OVERRIDES = {}
+        eng.VALUE_COMPONENT_OVERRIDES = {}
+    elif any([eng.ACTIVE_SKILLS, eng.LUCK_OWNED_OVERRIDES, eng.VALUE_COMPONENT_OVERRIDES]):
+        print("Using personal settings from config.py (source run only).")
     from dashboard_server import serve_dashboard
-    serve_dashboard(eng, open_browser="--no-open" not in sys.argv)
+    try:
+        serve_dashboard(eng, open_browser="--no-open" not in sys.argv)
+    except OSError as exc:
+        # The service could not bind or could not start. This is the one
+        # failure with no page to report itself on, so it gets the message box.
+        log_path = path / "dashboard_log.txt"
+        print(f"\nThe local service could not start: {exc}")
+        console.alert(
+            "OSRS Dashboard",
+            "The dashboard could not start its local service.\n\n"
+            f"{exc}\n\n"
+            "This is usually a firewall or security tool blocking a local "
+            "connection. Nothing leaves your computer either way.\n\n"
+            f"Details were saved to:\n{log_path}",
+        )
+        raise
 
 
 if __name__ == "__main__":
@@ -234,8 +262,11 @@ if __name__ == "__main__":
         print("-" * 58)
         traceback.print_exc()
         print("=" * 58)
-        print("If this keeps happening, open an issue with this whole window:")
-        print(f"  {ISSUES_URL}")
+        print(f"If this keeps happening, open an issue: {ISSUES_URL}")
+        stream = console.stream()
+        log_note = ""
+        if stream is not None and getattr(stream, "_log", None) is not None:
+            log_note = "\n\nThe full details were saved to your log file, next to your screenshots."
         # Holding the window open needs a console to hold. Without stdin this
         # raises rather than returning EOF, which would replace a readable
         # error with an unrelated traceback.
@@ -244,3 +275,6 @@ if __name__ == "__main__":
                 input("\nPress Enter to close this window...")
             except EOFError:
                 pass
+        else:
+            # Windowed build: nothing on screen to read. Say so in a dialog.
+            console.alert("OSRS Dashboard", f"The dashboard could not start.\n\n{exc}{log_note}")

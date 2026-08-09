@@ -4925,6 +4925,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
   <symbol id="i-report" viewBox="0 0 24 24"><path d="M12 4 2 20h20L12 4Zm0 6v5m0 3v.5"/></symbol>
   <symbol id="i-idea" viewBox="0 0 24 24"><path d="M9 18h6m-5 3h4M12 2a6 6 0 0 0-3.5 10.9V15h7v-2.1A6 6 0 0 0 12 2Z"/></symbol>
+  <symbol id="i-cog" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3M4.9 4.9l2.2 2.2m9.8 9.8 2.2 2.2M19.1 4.9l-2.2 2.2M7.1 16.9l-2.2 2.2"/></symbol>
   <symbol id="i-sparkle" viewBox="0 0 24 24"><path d="m12 3 2 5.5L19.5 10 14 12l-2 5.5L10 12 4.5 10 10 8.5 12 3Zm6.5 8.5.9 2.3 2.3.9-2.3.9-.9 2.3-.9-2.3-2.3-.9 2.3-.9.9-2.3Z"/></symbol>
 </svg>
 
@@ -4944,6 +4945,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
       <button class="rail-fb-btn" onclick="openReportDialog()"><svg><use href="#i-report"/></svg><span>Report an issue</span></button>
       <button class="rail-fb-btn" onclick="openFeatureDialog()"><svg><use href="#i-idea"/></svg><span>Request a feature</span></button>
       <button class="rail-fb-btn" onclick="openWhatsNew()"><svg><use href="#i-sparkle"/></svg><span>What&#39;s new</span></button>
+      <button class="rail-fb-btn" onclick="openSettings()"><svg><use href="#i-cog"/></svg><span>Settings</span></button>
     </div>
     <div class="rail-state"><span class="rail-state-dot"></span><div><strong>Local dashboard</strong><span>Loopback only</span></div></div>
   </div>
@@ -5746,6 +5748,156 @@ function submitFeedback() {{
   }});
   window.open(NEW_ISSUE_URL + '?' + params.toString(), '_blank', 'noopener');
   closeFeedbackModal();
+}}
+
+async function openSettings() {{
+  closeNavigation();
+  document.getElementById('fb-title').textContent = 'Settings';
+  document.getElementById('fb-lede').textContent = 'Which character this dashboard is built from, and how its data is kept up to date.';
+  document.getElementById('fb-form').style.display = 'none';
+  document.getElementById('fb-submit').style.display = 'none';
+  const holder = document.getElementById('fb-releases');
+  holder.style.display = '';
+  holder.textContent = 'Loading...';
+  document.getElementById('fb-modal').classList.add('open');
+  let data = null;
+  try {{
+    const response = await fetch('/api/settings', {{cache: 'no-store'}});
+    if (response.ok) data = await response.json();
+  }} catch (_error) {{ /* handled below */ }}
+  renderSettings(holder, data);
+}}
+
+function settingsRow(holder, label) {{
+  const wrap = document.createElement('div');
+  wrap.className = 'fb-release';
+  const head = document.createElement('div');
+  head.className = 'fb-release-head';
+  const tag = document.createElement('span');
+  tag.className = 'fb-release-tag';
+  tag.textContent = label;
+  head.appendChild(tag);
+  wrap.appendChild(head);
+  holder.appendChild(wrap);
+  return wrap;
+}}
+
+function renderSettings(holder, data) {{
+  holder.textContent = '';
+  if (!data || !data.ok) {{
+    const note = document.createElement('p');
+    note.className = 'fb-note';
+    note.textContent = 'Settings need the local service, which is not running. Open the dashboard through the app rather than opening the file directly.';
+    holder.appendChild(note);
+    return;
+  }}
+
+  const account = settingsRow(holder, 'Character');
+  const current = document.createElement('p');
+  current.className = 'fb-release-notes';
+  current.textContent = 'Currently showing ' + data.current + '.';
+  account.appendChild(current);
+
+  const others = (data.options || []).filter(name => name !== data.current);
+  if (others.length) {{
+    const picker = document.createElement('div');
+    picker.className = 'fb-actions';
+    picker.style.justifyContent = 'flex-start';
+    picker.style.flexWrap = 'wrap';
+    others.forEach(name => {{
+      const button = document.createElement('button');
+      button.className = 'feedback-btn';
+      button.textContent = 'Switch to ' + name;
+      button.onclick = () => switchCharacter(name, account);
+      picker.appendChild(button);
+    }});
+    account.appendChild(picker);
+  }} else {{
+    const only = document.createElement('p');
+    only.className = 'fb-note';
+    only.textContent = 'No other characters with screenshots were found.';
+    account.appendChild(only);
+  }}
+
+  const boss = settingsRow(holder, 'Boss data');
+  const bossNote = document.createElement('p');
+  bossNote.className = 'fb-release-notes';
+  bossNote.textContent = 'Bosses this app has not seen are looked up automatically as you play. A full refresh re-reads the wiki for every boss you have kills on, takes a few minutes, and is worth doing after a game update changes drops you care about.';
+  boss.appendChild(bossNote);
+  const bossActions = document.createElement('div');
+  bossActions.className = 'fb-actions';
+  bossActions.style.justifyContent = 'flex-start';
+  const bossButton = document.createElement('button');
+  bossButton.className = 'feedback-btn';
+  bossButton.textContent = 'Refresh boss data now';
+  bossButton.onclick = () => refreshBossData(bossButton);
+  bossActions.appendChild(bossButton);
+  boss.appendChild(bossActions);
+
+  const files = settingsRow(holder, 'Files');
+  const filesNote = document.createElement('p');
+  filesNote.className = 'fb-release-notes';
+  filesNote.textContent = 'Log: ' + (data.log || 'unavailable') +
+    String.fromCharCode(10) + 'Settings: ' + (data.settings_file || 'unavailable');
+  files.appendChild(filesNote);
+}}
+
+async function switchCharacter(name, container) {{
+  const note = document.createElement('p');
+  note.className = 'fb-note';
+  note.textContent = 'Saving...';
+  container.appendChild(note);
+  try {{
+    const response = await fetch('/api/settings/character', {{
+      method: 'POST',
+      headers: {{'Content-Type': 'application/json'}},
+      body: JSON.stringify({{character: name}})
+    }});
+    let result = null;
+    try {{
+      result = await response.json();
+    }} catch (_parse) {{
+      // A non-JSON body means the service answered with something unexpected.
+      // Say what actually happened rather than blaming the connection.
+      note.textContent = 'The local service returned an unexpected response (HTTP ' +
+        response.status + '). Check your log file for details.';
+      return;
+    }}
+    note.textContent = result.ok
+      ? (result.restart_required
+          ? name + ' will be used next time. Close this window and open the dashboard again to switch.'
+          : 'Already showing ' + name + '.')
+      : (result.message || 'That did not work.');
+  }} catch (_error) {{
+    note.textContent = 'Could not reach the local service. It may have stopped; check your log file.';
+  }}
+}}
+
+async function refreshBossData(button) {{
+  if (!appInteractive) return;
+  button.disabled = true;
+  button.textContent = 'Refreshing, this takes a few minutes...';
+  setAppStatus('Re-reading boss drop tables from the OSRS Wiki');
+  try {{
+    const response = await fetch('/api/refresh', {{
+      method: 'POST',
+      headers: {{'Content-Type': 'application/json'}},
+      body: JSON.stringify({{boss_data: true}})
+    }});
+    const result = await response.json();
+    if (result.ok) {{
+      button.textContent = 'Done. Reloading...';
+      window.location.reload();
+    }} else {{
+      button.disabled = false;
+      button.textContent = 'Refresh boss data now';
+      setAppStatus(result.message || 'Boss data refresh failed.');
+    }}
+  }} catch (_error) {{
+    button.disabled = false;
+    button.textContent = 'Refresh boss data now';
+    setAppStatus('Could not reach the local service.');
+  }}
 }}
 
 async function openWhatsNew() {{

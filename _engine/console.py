@@ -188,3 +188,31 @@ def recent(after=0, limit=RECENT_LINES):
 def can_prompt():
     """Whether an interactive input() is possible in this process."""
     return sys.stdin is not None and getattr(sys.stdin, "readable", lambda: False)()
+
+
+def alert(title, message):
+    """Last-resort way to tell the user something when there is no UI left.
+
+    Everything normally reports through the browser. This exists for the one
+    failure the browser cannot cover: the local service not starting, so there
+    is no page to render an error on. Without it, a windowed build in that
+    state simply does nothing when double-clicked, which is unreportable.
+
+    Falls back to printing when a message box is unavailable, so this is safe
+    to call on any platform and in any build.
+    """
+    printed = False
+    if sys.platform == "win32":
+        try:
+            import ctypes
+
+            # MB_OK | MB_ICONERROR | MB_SETFOREGROUND
+            ctypes.windll.user32.MessageBoxW(None, str(message), str(title), 0x10 | 0x10000)
+            printed = True
+        except Exception:  # noqa: BLE001 - a failed alert must not mask the real error
+            printed = False
+    if not printed:
+        try:
+            print(f"\n{title}\n{message}\n")
+        except Exception:  # noqa: BLE001
+            pass
