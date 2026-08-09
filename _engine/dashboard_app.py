@@ -136,7 +136,8 @@ if __name__ == "__main__":
         print("-" * 58)
         traceback.print_exc()
         print("=" * 58)
-        print("If this keeps happening, send this whole window to Kyle.")
+        print("If this keeps happening, open an issue with this whole window:")
+        print("  https://github.com/Ralten-OSRS/osrs-dashboard/issues")
         try:
             input("\nPress Enter to close this window...")
         except EOFError:

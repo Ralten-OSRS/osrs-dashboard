@@ -2527,7 +2527,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
     clog_card_str = f"{_clog_val:,}" if _clog_val else "—"
     luck_card_label = f"Luck · {luck_verdict_str}" if luck_bosses else "Luck"
     # Top 16 roughly matches the 99s Timeline's height so the grid-2 row has
-    # no dead column (Kyle flagged the whitespace with 8 rows, July 2026).
+    # no dead column (whitespace was flagged with 8 rows, July 2026).
     fav_bosses = sorted(hs_bosses.items(), key=lambda x: -x[1])[:16]
     total_boss_kc = sum(hs_bosses.values())
     fav_bosses_json = json.dumps([{"boss": _fb, "kc": _fk} for _fb, _fk in fav_bosses])
