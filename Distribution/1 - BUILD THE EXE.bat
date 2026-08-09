@@ -33,8 +33,20 @@ if errorlevel 1 (
   python -m pip install --user pyinstaller
   if errorlevel 1 goto :build_failed
 )
-python -m PyInstaller --onefile --console ^
+:: --windowed, not --console. A black terminal reads as something malicious to
+:: a non-technical player, especially straight after SmartScreen. Consequences,
+:: all handled and all easy to break again:
+::   - sys.stdout is None, so ALL output must go through console.py.
+::   - stdin does not exist, so nothing in the launcher may call input().
+::   - the first run asks which character in the browser, not the terminal.
+::   - errors surface on the local page, in the log beside the screenshots,
+::     and via console.alert() when the service itself cannot start.
+:: Before touching this line, read DESIGN.md and GitHub issue #2.
+python -m PyInstaller --onefile --windowed ^
   --name "OSRS Dashboard" ^
+  --hidden-import version ^
+  --hidden-import console ^
+  --hidden-import settings ^
   --hidden-import osrs_dashboard ^
   --hidden-import dashboard_server ^
   --hidden-import boss_drops_generated ^

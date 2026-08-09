@@ -15,20 +15,25 @@ import sys
 from pathlib import Path
 from urllib.request import Request, urlopen
 
-# Bump this in the same commit that gets tagged for a release. It is the only
-# thing the update check compares against, so a stale value here means users
-# are told they are current when they are not.
-APP_VERSION = "1.0.0"
-
-RELEASES_API = "https://api.github.com/repos/Ralten-OSRS/osrs-dashboard/releases/latest"
-RELEASES_PAGE = "https://github.com/Ralten-OSRS/osrs-dashboard/releases/latest"
-
 # Make the engine + drop tables importable whether we're running from source
 # (python dashboard_app.py) or frozen into an .exe by PyInstaller. PyInstaller
 # unpacks bundled modules to sys._MEIPASS at runtime.
 _HERE = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
 if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))
+
+# Version and GitHub coordinates live in version.py so the generator can stamp
+# the same numbers into the dashboard and into in-app issue reports.
+from version import APP_VERSION, ISSUES_URL, RELEASES_LATEST_API, RELEASES_PAGE  # noqa: E402
+import console  # noqa: E402
+import settings  # noqa: E402
+
+# Install at import time, not inside run(). A windowed build has no stdout, so
+# anything that raises while the remaining modules are still loading would
+# write its traceback to None and the process would die with nothing on screen
+# and nothing on disk. Installing here means even an import-time failure is
+# captured and can be reported.
+console.install()
 
 
 def _version_tuple(text):
@@ -54,7 +59,7 @@ def check_for_update(timeout=2.5):
     """
     try:
         request = Request(
-            RELEASES_API,
+            RELEASES_LATEST_API,
             headers={
                 "Accept": "application/vnd.github+json",
                 "User-Agent": f"osrs-dashboard/{APP_VERSION}",
@@ -101,9 +106,87 @@ def find_characters():
     return base, chars
 
 
+def bind_engine(eng, path, refresh_boss_data=False):
+    """Point the engine at one account's folder and neutralise personalisation."""
+    name = path.name
+    eng.FORCE_BOSS_DATA_REFRESH = refresh_boss_data
+    eng.PLAYER_NAME = name
+    eng.SCREENSHOTS_PATH = str(path)
+    eng.OUTPUT_FILE = str(path / "osrs_dashboard.html")
+    eng.XP_HISTORY_FILE = str(path / "xp_history.json")
+    eng.FAVORITES_FILE = str(path / "favorites.json")
+    eng.KNOWN_BOSSES_FILE = str(path / "known_bosses.json")
+    eng.ECONOMIC_EVENTS_FILE = str(path / "economic_events.json")
+    eng.VALUE_PRICE_CACHE_FILE = str(path / "value_price_cache.json")
+    eng.WIKI_DISCOVERY_CATALOG_FILE = str(path / "wiki_discovery_catalog.json")
+    # Hard-reset every personalization knob to neutral, so nobody inherits
+    # someone else's manual settings or attested loot.
+    #
+    # This keys off being packaged rather than off which script was launched.
+    # The exe is the only artefact that ships, and `sys.frozen` is always true
+    # there, so the reset always runs for every distributed copy — the exact
+    # protection DESIGN.md non-negotiable #10 asks for, tied to the condition
+    # that actually matters instead of to an entry point.
+    #
+    # Running from source deliberately keeps `config.py`. That is what the
+    # README documents config.py for, it is how the engine already behaved
+    # when run directly, and it lets the maintainer use the same launcher as
+    # everyone else rather than maintaining a private path that hides
+    # user-facing problems.
+    if getattr(sys, "frozen", False):
+        eng.ACTIVE_SKILLS = []
+        eng.LUCK_OWNED_OVERRIDES = {}
+        eng.VALUE_COMPONENT_OVERRIDES = {}
+    elif any([eng.ACTIVE_SKILLS, eng.LUCK_OWNED_OVERRIDES, eng.VALUE_COMPONENT_OVERRIDES]):
+        print("Using personal settings from config.py (source run only).")
+    return name
+
+
+def resolve_character(force_pick=False):
+    """Decide which character to build for, asking only when necessary.
+
+    Picking a character is answerable from saved state after the first run, so
+    asking every time is an amnesia problem rather than a UI one. We ask on the
+    first run, when the remembered folder has gone away, and when the user
+    explicitly asks to choose again with --pick. Otherwise we go straight to
+    building. Returns (name, Path) or (None, None).
+    """
+    base, _chars = find_characters()
+
+    if not force_pick:
+        remembered = settings.last_account()
+        if remembered:
+            folders = settings.account_folders(remembered, base)
+            if folders:
+                name = remembered["display_name"] or remembered["primary_folder"]
+                print(f"Building for {name}.")
+                return name, folders[0]
+            print(f"The folder for {remembered['display_name']} is no longer there.")
+            print("Let us pick again.\n")
+            settings.forget_last()
+
+    # One character with screenshots needs no question at all, which is the
+    # common first run. Only ambiguity is worth interrupting someone for.
+    _base, chars = find_characters()
+    with_shots = [(name, path) for (name, path, has_shots) in chars if has_shots]
+    if not force_pick and len(with_shots) == 1:
+        name, path = with_shots[0]
+        print(f"Found one character: {name}")
+        settings.remember_account(path.name, display_name=name)
+        return name, path
+
+    # Anything else gets asked in the browser, so this works identically with
+    # or without a console. Returning None here is not a failure; it tells the
+    # caller to start the service in setup mode.
+    return None, None
+
+
 def choose_character():
-    """Walk the user through picking a character. Returns (name, Path) or (None, None)."""
+    """Console picker. Retained for diagnostics; the browser is the real one."""
     base, chars = find_characters()
+    if not console.can_prompt():
+        print("This build cannot ask which character to use without a console.")
+        return None, None
     real = [(name, path) for (name, path, has_shots) in chars if has_shots]
 
     if real:
@@ -145,67 +228,64 @@ def choose_character():
         print("  That folder doesn't exist - double-check the path and try again.")
 
 
-def ask_boss_data_refresh():
-    """Offer a wiki refresh of boss drop tables before building.
-
-    Default is no. The fast path is what almost everyone wants: bosses this
-    app has never seen are looked up automatically anyway. The slow path only
-    matters when an existing boss's drop table has changed since this build.
-    """
-    print()
-    print("-" * 58)
-    print("  Boss data")
-    print()
-    print("  This app ships with drop tables from the day it was built. Any")
-    print("  boss it hasn't seen before gets looked up automatically as you")
-    print("  play, so you do not need this often.")
-    print()
-    print("  Refreshing re-reads the wiki for every boss you have kills on.")
-    print("  It takes a few minutes and is worth doing occasionally, or after")
-    print("  a game update changed drops you care about.")
-    print("-" * 58)
-    try:
-        answer = input("\nRefresh boss data first? [y/N]: ").strip().lower()
-    except EOFError:
-        return False
-    return answer in ("y", "yes")
-
-
 def run():
     banner()
     check_for_update()
-    print("Looking for your RuneLite screenshots...\n")
-    name, path = choose_character()
-    if not path:
-        print("\nNothing selected - no dashboard built. You can run this again anytime.")
-        return
 
-    refresh_boss_data = ask_boss_data_refresh()
+    force_pick = "--pick" in sys.argv
+    refresh_boss_data = "--refresh-boss-data" in sys.argv
 
-    print(f"\nBuilding the dashboard for {name}...")
-    print("(First run also starts your XP history; pace tracking fills in as")
-    print(" you refresh on future days.)\n")
-
+    name, path = resolve_character(force_pick=force_pick)
     import osrs_dashboard as eng
-    eng.FORCE_BOSS_DATA_REFRESH = refresh_boss_data
-    eng.PLAYER_NAME = name
-    eng.SCREENSHOTS_PATH = str(path)
-    eng.OUTPUT_FILE = str(path / "osrs_dashboard.html")
-    eng.XP_HISTORY_FILE = str(path / "xp_history.json")
-    eng.FAVORITES_FILE = str(path / "favorites.json")
-    eng.KNOWN_BOSSES_FILE = str(path / "known_bosses.json")
-    eng.ECONOMIC_EVENTS_FILE = str(path / "economic_events.json")
-    eng.VALUE_PRICE_CACHE_FILE = str(path / "value_price_cache.json")
-    eng.WIKI_DISCOVERY_CATALOG_FILE = str(path / "wiki_discovery_catalog.json")
-    # Hard-reset every personalization knob to neutral. Engine defaults are
-    # already neutral, but if a stray config.py ever gets bundled into the
-    # exe (or found on the user's machine), this guarantees no one inherits
-    # someone else's manual settings or attested loot.
-    eng.ACTIVE_SKILLS = []
-    eng.LUCK_OWNED_OVERRIDES = {}
-    eng.VALUE_COMPONENT_OVERRIDES = {}
+
+    setup_base = None
+    on_chosen = None
+    if path is None:
+        # Nothing resolved, so the browser asks. The service has to come up
+        # before an account exists, which is why it needs a base folder to
+        # scan and a callback to bind the engine once a choice arrives.
+        setup_base = find_characters()[0]
+        print("Opening your browser to choose a character...")
+        # Bind to the base folder for now; the callback re-points everything.
+        eng.SCREENSHOTS_PATH = str(setup_base)
+
+        def on_chosen(chosen_path):  # noqa: F811 - deliberate conditional definition
+            settings.remember_account(chosen_path.name, display_name=chosen_path.name)
+            console.install(log_path=chosen_path / "dashboard_log.txt")
+            bound = bind_engine(eng, chosen_path, refresh_boss_data)
+            print(f"\nBuilding the dashboard for {bound}...")
+    else:
+        # The log lives with the account data, so it can only be opened once
+        # the account is known. Everything printed before this point is
+        # already buffered and gets written out with the rest.
+        console.install(log_path=path / "dashboard_log.txt")
+        print(f"\nBuilding the dashboard for {name}...")
+        print("(First run also starts your XP history; pace tracking fills in as")
+        print(" you refresh on future days.)\n")
+        bind_engine(eng, path, refresh_boss_data)
+
     from dashboard_server import serve_dashboard
-    serve_dashboard(eng, open_browser="--no-open" not in sys.argv)
+    try:
+        serve_dashboard(
+            eng,
+            open_browser="--no-open" not in sys.argv,
+            setup_base=setup_base,
+            on_account_chosen=on_chosen,
+        )
+    except OSError as exc:
+        # The service could not bind or could not start. This is the one
+        # failure with no page to report itself on, so it gets the message box.
+        log_path = (path or Path.home()) / "dashboard_log.txt"
+        print(f"\nThe local service could not start: {exc}")
+        console.alert(
+            "OSRS Dashboard",
+            "The dashboard could not start its local service.\n\n"
+            f"{exc}\n\n"
+            "This is usually a firewall or security tool blocking a local "
+            "connection. Nothing leaves your computer either way.\n\n"
+            f"Details were saved to:\n{log_path}",
+        )
+        raise
 
 
 if __name__ == "__main__":
@@ -213,15 +293,26 @@ if __name__ == "__main__":
         run()
     except Exception as exc:  # noqa: BLE001 - top-level guard so the window never just vanishes
         import traceback
+        console.install()
         print("\n" + "=" * 58)
         print("Something went wrong while building the dashboard:")
         print(f"  {exc}")
         print("-" * 58)
         traceback.print_exc()
         print("=" * 58)
-        print("If this keeps happening, open an issue with this whole window:")
-        print("  https://github.com/Ralten-OSRS/osrs-dashboard/issues")
-        try:
-            input("\nPress Enter to close this window...")
-        except EOFError:
-            pass
+        print(f"If this keeps happening, open an issue: {ISSUES_URL}")
+        stream = console.stream()
+        log_note = ""
+        if stream is not None and getattr(stream, "_log", None) is not None:
+            log_note = "\n\nThe full details were saved to your log file, next to your screenshots."
+        # Holding the window open needs a console to hold. Without stdin this
+        # raises rather than returning EOF, which would replace a readable
+        # error with an unrelated traceback.
+        if console.can_prompt():
+            try:
+                input("\nPress Enter to close this window...")
+            except EOFError:
+                pass
+        else:
+            # Windowed build: nothing on screen to read. Say so in a dialog.
+            console.alert("OSRS Dashboard", f"The dashboard could not start.\n\n{exc}{log_note}")

@@ -1,0 +1,6 @@
+@echo off
+title Audit Shared Drops
+cd /d "%~dp0.."
+python "%~dp0audit_shared_drops.py"
+echo.
+pause

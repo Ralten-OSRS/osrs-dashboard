@@ -30,9 +30,15 @@ Download the latest `OSRS.Dashboard.exe` from the [Releases](../../releases) pag
 
 Windows may show a blue "Windows protected your PC" warning. Click **More info**, then **Run anyway**. That warning appears because the file isn't signed through the Microsoft Store, not because anything is wrong with it. Nothing gets installed.
 
-A console window opens and lists the characters it found under your RuneLite screenshots folder. Type the number next to the one you want and press Enter. The dashboard builds and opens in your browser.
+Your browser opens straight away. If you have more than one character with screenshots, it asks which one you want and remembers the answer, so you only choose once. Then it reads your screenshots, showing progress as it goes, and your dashboard appears when it's done. The first run on a large account takes a minute or so.
 
-Use the **Refresh** button inside the page to rescan. The console window closes itself a few seconds after you close the last dashboard tab.
+Every run after that goes straight to building. Use the **Refresh** button inside the page to rescan whenever you like, and **Settings** in the sidebar to switch characters or refresh boss data.
+
+There's no terminal and nothing to install. The app closes itself a few seconds after you close the last dashboard tab.
+
+### If something goes wrong
+
+Errors appear on the page rather than disappearing. Every run also writes `dashboard_log.txt` next to your screenshots, which is the thing to attach if you open an issue. The **Report an issue** button in the sidebar fills in your version and setup details for you.
 
 ## Staying Up To Date
 
@@ -42,19 +48,21 @@ You can also click **Watch** at the top of this page, choose **Custom**, and tic
 
 ## Refreshing Boss Data
 
-At startup the app asks whether to refresh boss data first. Saying no is the normal path.
+You don't normally need to. Bosses the app has never seen are looked up on the OSRS Wiki automatically as you play, so new content starts working on its own.
 
-Bosses the app has never seen before are looked up on the OSRS Wiki automatically as you play, so new content starts working without you doing anything. The refresh covers the narrower case where a boss you already fight has had its drop table changed since your copy was built. It re-reads the wiki for every boss you have kills on, takes a few minutes, and can be stopped with Ctrl+C without losing what it already collected.
+The manual refresh, under **Settings**, covers the narrower case where a boss you already fight has had its drop table changed since your copy was built. It re-reads the wiki for every boss you have kills on and takes a few minutes.
 
 ## Running From Source
 
 If you'd rather run the Python directly:
 
 1. Install Python 3.8 or newer, checking "Add Python to PATH" during setup.
-2. Copy `config.example.py` to `config.py` and set `PLAYER_NAME` to your character name. It's case-sensitive and has to match the folder name under `~/.runelite/screenshots/`.
-3. Double-click `1 - Refresh Dashboard.bat`.
+2. Double-click `1 - Refresh Dashboard.bat`. It runs the same launcher the packaged app does, so it behaves the same way — it asks which character on the first run and remembers it.
+3. Optionally, copy `config.example.py` to `config.py` for personal tweaks such as attesting drops you own but never screenshotted. Source runs read it; the packaged app deliberately ignores it, so nobody inherits someone else's settings.
 
-Two other launchers are included. `2 - Update Drop Tables.bat` refreshes boss drop tables, rates, and Combat Achievement data from the OSRS Wiki, worth running after notable game updates. `3 - Audit Shared Drops.bat` is a diagnostic for items that appear on several drop tables.
+The launcher takes `--pick` to choose a different character and `--refresh-boss-data` to re-read the wiki before building.
+
+`_engine/` holds two maintainer scripts you will not normally need — a wiki refresh of the bundled drop tables, and a diagnostic for items that drop from several bosses. See `READ ME - maintainer tools.txt` there for when each is worth running.
 
 All Python lives in `_engine/`. The fonts and Chart.js in `OSRS Dashboard Resources/` are embedded into the generated page so it renders with no network connection.
 
@@ -62,7 +70,7 @@ All Python lives in `_engine/`. The fonts and Chart.js in `OSRS Dashboard Resour
 
 It never edits, moves, or deletes screenshots. It reads them.
 
-Alongside your screenshots it writes `osrs_dashboard.html` plus small JSON files holding XP history, known bosses, favorites, and local caches. Those belong to your account and stay on your machine.
+Alongside your screenshots it writes `osrs_dashboard.html`, a `dashboard_log.txt` from the most recent runs, and small JSON files holding XP history, known bosses, favorites, and local caches. Those belong to your account and stay on your machine. Which character you last used is remembered separately, under your Windows app data folder.
 
 The only network calls are to the OSRS hiscores, the OSRS Wiki, and the Grand Exchange price feed. Your data is never sent anywhere.
 
@@ -71,6 +79,20 @@ The only network calls are to the OSRS hiscores, the OSRS Wiki, and the Grand Ex
 The engine scans filenames and image content in the RuneLite screenshot folder to identify level-ups, drops, pets, quest completions, and Combat Achievements, then cross-references them against wiki-sourced drop tables and live GE prices. Newly seen bosses trigger a targeted wiki lookup, so the drop data keeps up without manual maintenance.
 
 Wealth tracking only counts items with clear evidence and a resolvable price. Incomplete item builds are shown separately from realized value rather than folded into it.
+
+## Troubleshooting
+
+**Nothing appears when I run it.** Check `dashboard_log.txt` next to your screenshots. If that file doesn't exist either, the app failed before it could find your screenshot folder — open an issue and say what happened.
+
+**Charts are empty.** Your hiscores couldn't be reached, either because the name isn't on the hiscores yet or the network is down. Everything built from screenshots still works.
+
+**Bosses I've killed aren't showing up.** RuneLite only saves screenshots for valuable drops, untradeables, collection log entries, and combat achievements, and only with the relevant plugin settings enabled. Anything it never screenshotted can't appear.
+
+**Wealth says prices are unavailable.** The public price feed couldn't be reached and there's no saved quote yet. Nothing is lost; refresh again later and the value resolves.
+
+**A boss is showing items that aren't its own.** Some items drop from several bosses and can't be attributed from a filename alone. Items on four or more drop tables are grouped automatically; if one slips through, open an issue with the boss and item.
+
+**It's building the wrong character.** Open **Settings** in the sidebar and switch. It applies the next time you start the app.
 
 ## Feedback
 
