@@ -33,6 +33,11 @@ if errorlevel 1 (
   python -m pip install --user pyinstaller
   if errorlevel 1 goto :build_failed
 )
+:: Still --console, deliberately. Going windowed is blocked on the first-run
+:: character picker moving into the browser: with no console and nothing
+:: remembered, the launcher has no way to ask which character to use, so a new
+:: user's first double-click would do nothing visible at all. Flip this only
+:: once that picker exists. See DESIGN.md and GitHub issue #2.
 python -m PyInstaller --onefile --console ^
   --name "OSRS Dashboard" ^
   --hidden-import version ^

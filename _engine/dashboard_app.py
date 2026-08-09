@@ -28,6 +28,13 @@ from version import APP_VERSION, ISSUES_URL, RELEASES_LATEST_API, RELEASES_PAGE 
 import console  # noqa: E402
 import settings  # noqa: E402
 
+# Install at import time, not inside run(). A windowed build has no stdout, so
+# anything that raises while the remaining modules are still loading would
+# write its traceback to None and the process would die with nothing on screen
+# and nothing on disk. Installing here means even an import-time failure is
+# captured and can be reported.
+console.install()
+
 
 def _version_tuple(text):
     """Turn a tag like 'v1.2.3' into (1, 2, 3). Unparseable pieces become 0."""
@@ -179,7 +186,6 @@ def choose_character():
 
 
 def run():
-    console.install()
     banner()
     check_for_update()
 
