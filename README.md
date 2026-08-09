@@ -26,7 +26,7 @@ Seven pages, all built from your own data:
 
 ## Getting Started
 
-Download the latest `OSRS Dashboard.exe` from the [Releases](../../releases) page and double-click it.
+Download the latest `OSRS.Dashboard.exe` from the [Releases](../../releases) page and double-click it. GitHub writes the filename with dots in place of spaces, which changes nothing about how it runs.
 
 Windows may show a blue "Windows protected your PC" warning. Click **More info**, then **Run anyway**. That warning appears because the file isn't signed through the Microsoft Store, not because anything is wrong with it. Nothing gets installed.
 

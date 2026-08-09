@@ -15,7 +15,8 @@ WHAT YOU NEED
 
 
 HOW TO RUN IT
-  1. Double-click  "OSRS Dashboard.exe".
+  1. Double-click  "OSRS Dashboard.exe".  (If you downloaded it from
+     GitHub it will be named "OSRS.Dashboard.exe" - same file.)
 
   2. If Windows shows a blue "Windows protected your PC" box, click
      "More info", then "Run anyway". That box just means the app isn't from
