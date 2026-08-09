@@ -145,6 +145,32 @@ def choose_character():
         print("  That folder doesn't exist - double-check the path and try again.")
 
 
+def ask_boss_data_refresh():
+    """Offer a wiki refresh of boss drop tables before building.
+
+    Default is no. The fast path is what almost everyone wants: bosses this
+    app has never seen are looked up automatically anyway. The slow path only
+    matters when an existing boss's drop table has changed since this build.
+    """
+    print()
+    print("-" * 58)
+    print("  Boss data")
+    print()
+    print("  This app ships with drop tables from the day it was built. Any")
+    print("  boss it hasn't seen before gets looked up automatically as you")
+    print("  play, so you do not need this often.")
+    print()
+    print("  Refreshing re-reads the wiki for every boss you have kills on.")
+    print("  It takes a few minutes and is worth doing occasionally, or after")
+    print("  a game update changed drops you care about.")
+    print("-" * 58)
+    try:
+        answer = input("\nRefresh boss data first? [y/N]: ").strip().lower()
+    except EOFError:
+        return False
+    return answer in ("y", "yes")
+
+
 def run():
     banner()
     check_for_update()
@@ -154,11 +180,14 @@ def run():
         print("\nNothing selected - no dashboard built. You can run this again anytime.")
         return
 
+    refresh_boss_data = ask_boss_data_refresh()
+
     print(f"\nBuilding the dashboard for {name}...")
     print("(First run also starts your XP history; pace tracking fills in as")
     print(" you refresh on future days.)\n")
 
     import osrs_dashboard as eng
+    eng.FORCE_BOSS_DATA_REFRESH = refresh_boss_data
     eng.PLAYER_NAME = name
     eng.SCREENSHOTS_PATH = str(path)
     eng.OUTPUT_FILE = str(path / "osrs_dashboard.html")

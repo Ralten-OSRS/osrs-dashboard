@@ -305,30 +305,69 @@ def classify_item(seed_item, item_cache=None, fetch_page=None):
     return None, classification, reason
 
 
-def refresh_catalog(new_bosses, acquisitions, existing_recipes, catalog_file, now=None):
-    """Refresh account-local discovery data and return dynamic recipes/references."""
+def refresh_catalog(new_bosses, acquisitions, existing_recipes, catalog_file, now=None,
+                    force_bosses=None, progress=None):
+    """Refresh account-local discovery data and return dynamic recipes/references.
+
+    `new_bosses` are fetched once and then skipped on every later run, which is
+    what keeps an ordinary refresh cheap. `force_bosses` overrides that skip so
+    a boss already in the catalog gets re-read from the wiki — this is the only
+    way a user picks up items added to a boss's drop table after their copy was
+    built. It costs one wiki request per boss, so it must stay opt-in.
+
+    `progress(position, total, boss)` is called before each fetch. Ctrl+C stops
+    the sweep and keeps whatever was already collected.
+    """
     now = now or datetime.now()
     catalog = _catalog(_read_json(catalog_file, {}))
     changed = False
     discovered_bosses = []
-    for boss in new_bosses or []:
+    refreshed_bosses = []
+    interrupted = False
+
+    known = {normalize_item(name) for name in catalog["bosses"]}
+    forced = {normalize_item(name) for name in (force_bosses or []) if normalize_item(name)}
+
+    queue, queued = [], set()
+    for boss in list(new_bosses or []) + list(force_bosses or []):
         key = normalize_item(boss)
-        if not key or key in {normalize_item(name) for name in catalog["bosses"]}:
+        if not key or key in queued:
             continue
-        try:
-            page = _fetch_wiki_page(boss)
-            drops, rates = _parse_drops(page["wikitext"])
-        except (OSError, ValueError, HTTPError, URLError, RuntimeError):
+        if key in known and key not in forced:
             continue
-        if drops:
-            catalog["bosses"][boss] = {
-                "drops": drops,
-                "rates": rates,
-                "discovered_at": now.isoformat(timespec="seconds"),
-            }
-            discovered_bosses.append(boss)
-            changed = True
-        time.sleep(0.25)
+        queue.append(boss)
+        queued.add(key)
+
+    try:
+        for position, boss in enumerate(queue, 1):
+            key = normalize_item(boss)
+            if progress:
+                progress(position, len(queue), boss)
+            try:
+                page = _fetch_wiki_page(boss)
+                drops, rates = _parse_drops(page["wikitext"])
+            except (OSError, ValueError, HTTPError, URLError, RuntimeError):
+                continue
+            if drops:
+                # Reuse the existing key when this boss is already catalogued,
+                # so a casing difference can't create a duplicate entry.
+                target = next(
+                    (name for name in catalog["bosses"] if normalize_item(name) == key),
+                    boss,
+                )
+                was_known = key in known
+                catalog["bosses"][target] = {
+                    "drops": drops,
+                    "rates": rates,
+                    "discovered_at": now.isoformat(timespec="seconds"),
+                }
+                (refreshed_bosses if was_known else discovered_bosses).append(target)
+                known.add(key)
+                changed = True
+            time.sleep(0.25)
+    except KeyboardInterrupt:
+        # Partial progress is still worth keeping; it is written out below.
+        interrupted = True
 
     registered = {
         normalize_item(component)
@@ -388,6 +427,8 @@ def refresh_catalog(new_bosses, acquisitions, existing_recipes, catalog_file, no
         "recipes": catalog["recipes"],
         "bosses": catalog["bosses"],
         "new_bosses": discovered_bosses,
+        "refreshed_bosses": refreshed_bosses,
+        "interrupted": interrupted,
         "new_recipes": enrolled,
         "ambiguous_items": ambiguous,
         "checked_items": checked,

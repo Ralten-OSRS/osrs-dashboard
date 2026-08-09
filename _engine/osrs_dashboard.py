@@ -114,6 +114,18 @@ ECONOMIC_EVENTS_FILE = str(Path(SCREENSHOTS_PATH) / "economic_events.json")
 VALUE_PRICE_CACHE_FILE = str(Path(SCREENSHOTS_PATH) / "value_price_cache.json")
 WIKI_DISCOVERY_CATALOG_FILE = str(Path(SCREENSHOTS_PATH) / "wiki_discovery_catalog.json")
 
+# Opt-in only. A normal refresh looks up bosses it has never seen and skips the
+# rest, which is what keeps it fast. Setting this re-reads the wiki for every
+# boss the account has kills on, so items added to an already-known boss's drop
+# table get picked up without waiting for a new build. The packaged launcher
+# asks the user; nothing sets it automatically.
+FORCE_BOSS_DATA_REFRESH = False
+
+
+def _boss_refresh_progress(position, total, boss):
+    """Print one line per boss during a forced refresh so it never looks hung."""
+    print(f"  [{position}/{total}] {boss}")
+
 # Road to Max forecasting uses a rolling two-week window: responsive enough
 # to follow a real playstyle change, but less volatile than a single week.
 PACE_WINDOW_DAYS = 14
@@ -6463,12 +6475,25 @@ def generate_dashboard():
     xp_history = update_xp_history(hiscores)
     favorite_paths = load_favorite_paths()
     acquisitions = build_economic_acquisitions(data, VALUE_COMPONENT_OVERRIDES)
+    if FORCE_BOSS_DATA_REFRESH:
+        _force_bosses = [name for name in hiscores.get("boss_names", []) if name]
+        print(f"\nRefreshing wiki drop tables for {len(_force_bosses)} bosses.")
+        print("This runs one wiki lookup per boss. Ctrl+C stops it and keeps")
+        print("whatever finished; the dashboard still builds either way.\n")
+    else:
+        _force_bosses = None
     discovery = refresh_catalog(
         newly_seen_bosses,
         acquisitions,
         VALUE_RECIPES,
         WIKI_DISCOVERY_CATALOG_FILE,
+        force_bosses=_force_bosses,
+        progress=_boss_refresh_progress if FORCE_BOSS_DATA_REFRESH else None,
     )
+    if discovery.get("interrupted"):
+        print("\nStopped early. Everything fetched so far was saved.\n")
+    if discovery.get("refreshed_bosses"):
+        print(f"Refreshed drop tables for {len(discovery['refreshed_bosses'])} bosses.")
     apply_discovered_boss_references(discovery.get("bosses"))
     all_value_recipes = list(VALUE_RECIPES) + [
         recipe for recipe in discovery.get("recipes", [])

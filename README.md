@@ -34,6 +34,18 @@ A console window opens and lists the characters it found under your RuneLite scr
 
 Use the **Refresh** button inside the page to rescan. The console window closes itself a few seconds after you close the last dashboard tab.
 
+## Staying Up To Date
+
+The app checks for a newer release when it starts and tells you if one exists. It never downloads anything by itself, and it stays quiet when you're offline or already current.
+
+You can also click **Watch** at the top of this page, choose **Custom**, and tick **Releases**. GitHub will email you when a new version is published and stay silent the rest of the time.
+
+## Refreshing Boss Data
+
+At startup the app asks whether to refresh boss data first. Saying no is the normal path.
+
+Bosses the app has never seen before are looked up on the OSRS Wiki automatically as you play, so new content starts working without you doing anything. The refresh covers the narrower case where a boss you already fight has had its drop table changed since your copy was built. It re-reads the wiki for every boss you have kills on, takes a few minutes, and can be stopped with Ctrl+C without losing what it already collected.
+
 ## Running From Source
 
 If you'd rather run the Python directly:
