@@ -36,6 +36,8 @@ if errorlevel 1 (
 python -m PyInstaller --onefile --console ^
   --name "OSRS Dashboard" ^
   --hidden-import version ^
+  --hidden-import console ^
+  --hidden-import settings ^
   --hidden-import osrs_dashboard ^
   --hidden-import dashboard_server ^
   --hidden-import boss_drops_generated ^

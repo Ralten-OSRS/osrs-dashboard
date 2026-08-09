@@ -24,7 +24,9 @@ if str(_HERE) not in sys.path:
 
 # Version and GitHub coordinates live in version.py so the generator can stamp
 # the same numbers into the dashboard and into in-app issue reports.
-from version import APP_VERSION, RELEASES_LATEST_API, RELEASES_PAGE  # noqa: E402
+from version import APP_VERSION, ISSUES_URL, RELEASES_LATEST_API, RELEASES_PAGE  # noqa: E402
+import console  # noqa: E402
+import settings  # noqa: E402
 
 
 def _version_tuple(text):
@@ -97,9 +99,44 @@ def find_characters():
     return base, chars
 
 
+def resolve_character(force_pick=False):
+    """Decide which character to build for, asking only when necessary.
+
+    Picking a character is answerable from saved state after the first run, so
+    asking every time is an amnesia problem rather than a UI one. We ask on the
+    first run, when the remembered folder has gone away, and when the user
+    explicitly asks to choose again with --pick. Otherwise we go straight to
+    building. Returns (name, Path) or (None, None).
+    """
+    base, _chars = find_characters()
+
+    if not force_pick:
+        remembered = settings.last_account()
+        if remembered:
+            folders = settings.account_folders(remembered, base)
+            if folders:
+                name = remembered["display_name"] or remembered["primary_folder"]
+                print(f"Building for {name}.")
+                print("Not you? Close this and run it again with --pick.")
+                return name, folders[0]
+            print(f"The folder for {remembered['display_name']} is no longer there.")
+            print("Let us pick again.\n")
+            settings.forget_last()
+
+    name, path = choose_character()
+    if path is not None:
+        settings.remember_account(path.name, display_name=name)
+    return name, path
+
+
 def choose_character():
     """Walk the user through picking a character. Returns (name, Path) or (None, None)."""
     base, chars = find_characters()
+    if not console.can_prompt():
+        # No stdin means no picker. Slice 2 moves this into the browser; until
+        # then, failing loudly beats hanging on a read that can never return.
+        print("This build cannot ask which character to use without a console.")
+        return None, None
     real = [(name, path) for (name, path, has_shots) in chars if has_shots]
 
     if real:
@@ -141,42 +178,23 @@ def choose_character():
         print("  That folder doesn't exist - double-check the path and try again.")
 
 
-def ask_boss_data_refresh():
-    """Offer a wiki refresh of boss drop tables before building.
-
-    Default is no. The fast path is what almost everyone wants: bosses this
-    app has never seen are looked up automatically anyway. The slow path only
-    matters when an existing boss's drop table has changed since this build.
-    """
-    print()
-    print("-" * 58)
-    print("  Boss data")
-    print()
-    print("  This app ships with drop tables from the day it was built. Any")
-    print("  boss it hasn't seen before gets looked up automatically as you")
-    print("  play, so you do not need this often.")
-    print()
-    print("  Refreshing re-reads the wiki for every boss you have kills on.")
-    print("  It takes a few minutes and is worth doing occasionally, or after")
-    print("  a game update changed drops you care about.")
-    print("-" * 58)
-    try:
-        answer = input("\nRefresh boss data first? [y/N]: ").strip().lower()
-    except EOFError:
-        return False
-    return answer in ("y", "yes")
-
-
 def run():
+    console.install()
     banner()
     check_for_update()
-    print("Looking for your RuneLite screenshots...\n")
-    name, path = choose_character()
+
+    force_pick = "--pick" in sys.argv
+    refresh_boss_data = "--refresh-boss-data" in sys.argv
+
+    name, path = resolve_character(force_pick=force_pick)
     if not path:
         print("\nNothing selected - no dashboard built. You can run this again anytime.")
         return
 
-    refresh_boss_data = ask_boss_data_refresh()
+    # The log lives with the account data, so it can only be opened once the
+    # account is known. Everything printed before this point is already in the
+    # in-memory buffer and gets written out with the rest.
+    console.install(log_path=path / "dashboard_log.txt")
 
     print(f"\nBuilding the dashboard for {name}...")
     print("(First run also starts your XP history; pace tracking fills in as")
@@ -209,6 +227,7 @@ if __name__ == "__main__":
         run()
     except Exception as exc:  # noqa: BLE001 - top-level guard so the window never just vanishes
         import traceback
+        console.install()
         print("\n" + "=" * 58)
         print("Something went wrong while building the dashboard:")
         print(f"  {exc}")
@@ -216,8 +235,12 @@ if __name__ == "__main__":
         traceback.print_exc()
         print("=" * 58)
         print("If this keeps happening, open an issue with this whole window:")
-        print("  https://github.com/Ralten-OSRS/osrs-dashboard/issues")
-        try:
-            input("\nPress Enter to close this window...")
-        except EOFError:
-            pass
+        print(f"  {ISSUES_URL}")
+        # Holding the window open needs a console to hold. Without stdin this
+        # raises rather than returning EOF, which would replace a readable
+        # error with an unrelated traceback.
+        if console.can_prompt():
+            try:
+                input("\nPress Enter to close this window...")
+            except EOFError:
+                pass
