@@ -1,0 +1,26 @@
+# Line ending normalization.
+#
+# Text files are stored in the repository with LF endings and checked out
+# using whatever the local platform expects. Without this, files saved on
+# Windows appear as entirely rewritten every time, which makes it impossible
+# to see what actually changed between two versions.
+
+* text=auto
+
+# Windows batch launchers keep CRLF so they run reliably from Explorer.
+*.bat text eol=crlf
+
+# Source and documentation stay LF.
+*.py   text eol=lf
+*.md   text eol=lf
+*.txt  text eol=lf
+*.js   text eol=lf
+*.json text eol=lf
+
+# Binary assets are never converted.
+*.woff2 binary
+*.png   binary
+*.jpg   binary
+*.docx  binary
+*.exe   binary
+*.zip   binary

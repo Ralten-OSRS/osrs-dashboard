@@ -1,0 +1,40 @@
+# Personal configuration stays local. The neutral template is tracked.
+config.py
+
+# Python bytecode.
+__pycache__/
+*.py[cod]
+
+# Build products and historical archives are preserved on disk, but are not
+# duplicated into Git history.
+_Archive/
+Distribution/_Archive/
+Distribution/_build/
+Distribution/Clan Package/OSRS Dashboard.exe
+
+# Workspace operating files. These describe how the project is worked on
+# rather than how the dashboard works, and they stay on the local machine.
+AGENTS.md
+CLAUDE.md
+MEMORY.md
+DESIGN.md
+
+# Internal design material: the redesign specification, approved mockups,
+# and the isolated prototype with its screenshot fixtures.
+OSRS Dashboard Resources/.gitkeep
+OSRS Dashboard Resources/*.png
+OSRS Dashboard Resources/OSRS Dashboard Redesign Definition.md
+OSRS Dashboard Resources/OSRS Dashboard Redesign Definition.docx
+OSRS Dashboard Resources/Redesign Prototype/
+OSRS Dashboard Resources/Beta Dashboard Implementation/
+
+# This repository is the source of truth for the code, so the copied source
+# folder that used to ship inside the clan package is retired.
+Distribution/Clan Package/Source Code (for the curious)/
+Distribution/0 - READ ME FIRST (Kyle).md
+Distribution/Source Code README.txt
+
+# Local editor and operating-system noise.
+.DS_Store
+Thumbs.db
+desktop.ini
