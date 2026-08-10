@@ -36,6 +36,8 @@ Every run after that goes straight to building. Use the **Refresh** button insid
 
 There's no terminal and nothing to install. The app closes itself a few seconds after you close the last dashboard tab.
 
+Keep the file somewhere other than Downloads and you can pin it to your taskbar like any other app. When a new version comes out, save it over the copy you already have so the pin keeps pointing at the current one.
+
 ### If something goes wrong
 
 Errors appear on the page rather than disappearing. Every run also writes `dashboard_log.txt` next to your screenshots, which is the thing to attach if you open an issue. The **Report an issue** button in the sidebar fills in your version and setup details for you.
