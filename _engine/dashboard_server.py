@@ -154,6 +154,16 @@ SETUP_PAGE = """<!DOCTYPE html>
     color:var(--text); font-family:inherit; font-size:1rem; text-align:left; cursor:pointer; }
   button.pick:hover { background:#18150e; border-color:#3f331e; color:var(--gold-bright); }
   button.pick span { color:var(--dim); font-size:.78rem; }
+  /* Four children now, so the row is laid out explicitly rather than leaning on
+     space-between, which only worked while there were exactly two. */
+  button.pick { justify-content:flex-start; gap:10px; }
+  button.pick .pick-name { flex:1; color:inherit; font-size:1rem; text-align:left; }
+  button.pick .tag { flex:none; color:var(--gold); font-size:.7rem;
+    border:1px solid var(--bright); padding:1px 6px; letter-spacing:.4px; }
+  button.pick .pick-count { flex:none; }
+  button.pick .go-mark { flex:none; color:var(--bright); font-size:1.1rem; line-height:1;
+    transition:color .15s, transform .15s; }
+  button.pick:hover .go-mark { color:var(--gold-bright); transform:translateX(2px); }
   button.pick:disabled { opacity:.5; cursor:wait; }
   .manual { margin-top:18px; }
   .manual label { display:block; font-size:.8rem; color:var(--dim); margin-bottom:6px; }
@@ -208,6 +218,10 @@ SETUP_PAGE = """<!DOCTYPE html>
   <h1>Choose your character</h1>
   <p class="sub" id="sub">Loading...</p>
   <div class="card" id="list" style="display:none"></div>
+  <details class="disclose" id="pickModeWrap" style="display:none">
+    <summary id="pickModeSummary">Show other game modes</summary>
+    <div class="card" id="pickModes"></div>
+  </details>
 
   <div class="step" id="step2" style="display:none">
     <h2>Has this character had other names?</h2>
@@ -240,13 +254,14 @@ SETUP_PAGE = """<!DOCTYPE html>
     <span class="meta" id="summary" style="color:var(--dim);font-size:.8rem"></span>
   </div>
 
-  <div class="manual" id="manual" style="display:none">
-    <label for="path">Or paste the full path to your character&#39;s screenshot folder</label>
+  <details class="manual disclose" id="manual" style="display:none">
+    <summary>My screenshot folder is not listed</summary>
+    <label for="path">Paste the full path to your character&#39;s screenshot folder</label>
     <div class="row">
       <input id="path" type="text" spellcheck="false" placeholder="C:\\Users\\you\\.runelite\\screenshots\\YourName">
       <button class="go" onclick="submitPath()">Use this</button>
     </div>
-  </div>
+  </details>
   <p class="err" id="err"></p>
   <p class="hint" id="hint"></p>
 </div>
@@ -356,16 +371,42 @@ async function load() {
       'This app tells one account\\u2019s story. Pick the character you play now \\u2014 ' +
       'if it has had other names, you can add those next so nothing is left out. ' +
       'This is remembered, so you only do it once.';
+    // Game modes are collapsed here too, not just in the "other names" step.
+    // Picking a league folder as your character is allowed and produces a
+    // coherent league dashboard, but it is never the common answer, and on a
+    // machine with a dozen folders it buries the one the user wants.
+    var modeHolder = document.getElementById('pickModes');
+    var modeCount = 0;
     FOLDERS.forEach(function (f) {
       var b = document.createElement('button');
       b.className = 'pick';
-      b.appendChild(document.createTextNode(f.name));
+      var nameEl = document.createElement('span');
+      nameEl.className = 'pick-name';
+      nameEl.textContent = f.name;
+      b.appendChild(nameEl);
+      if (f.mode) {
+        var tag = document.createElement('span');
+        tag.className = 'tag';
+        tag.textContent = f.mode;
+        b.appendChild(tag);
+      }
       var s = document.createElement('span');
+      s.className = 'pick-count';
       s.textContent = shotLabel(f.shots);
       b.appendChild(s);
+      // Without this the rows read as a list rather than as choices. The count
+      // alone gave no signal that anything here was clickable.
+      var go = document.createElement('span');
+      go.className = 'go-mark';
+      go.textContent = '\\u203A';
+      b.appendChild(go);
       b.onclick = function () { pickCurrent(f.name, b); };
-      list.appendChild(b);
+      if (f.mode) { modeHolder.appendChild(b); modeCount++; }
+      else { list.appendChild(b); }
     });
+    document.getElementById('pickModeWrap').style.display = modeCount ? '' : 'none';
+    document.getElementById('pickModeSummary').textContent =
+      'Show other game modes (' + modeCount + ')';
     list.style.display = '';
     document.getElementById('hint').textContent =
       'Wrong one? You can change it later under Settings in the dashboard.';
