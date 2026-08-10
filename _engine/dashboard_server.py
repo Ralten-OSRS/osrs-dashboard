@@ -173,7 +173,17 @@ SETUP_PAGE = """<!DOCTYPE html>
   label.opt { display:flex; align-items:center; gap:10px; padding:10px 14px; cursor:pointer;
     border:1px solid transparent; color:var(--text); font-size:.92rem; }
   label.opt:hover { background:#18150e; border-color:#3f331e; }
-  label.opt input { flex:none; width:15px; height:15px; accent-color:var(--gold); }
+  /* Rebuilt rather than tinted: accent-color leaves the unchecked box white,
+     which is the one bit of browser chrome loud enough to break this palette. */
+  input[type=checkbox] { appearance:none; -webkit-appearance:none; flex:none;
+    width:15px; height:15px; border:1px solid var(--bright); background:var(--bg);
+    cursor:pointer; position:relative; transition:border-color .15s, background .15s; }
+  input[type=checkbox]:hover { border-color:var(--gold); }
+  input[type=checkbox]:checked { border-color:var(--gold); background:#5c4620; }
+  input[type=checkbox]:checked::after { content:""; position:absolute; left:4px; top:0;
+    width:4px; height:9px; border:solid var(--gold-bright); border-width:0 2px 2px 0;
+    transform:rotate(45deg); }
+  input[type=checkbox]:focus-visible { outline:1px solid var(--gold-bright); outline-offset:2px; }
   label.opt .meta { margin-left:auto; color:var(--dim); font-size:.75rem; }
   label.opt .tag { color:var(--gold); font-size:.7rem; border:1px solid var(--bright);
     padding:1px 6px; letter-spacing:.4px; }

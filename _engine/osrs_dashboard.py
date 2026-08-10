@@ -3343,6 +3343,39 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
     --green: #3a6b20;
   }}
 
+  /* Checkboxes in the settings composition list. The native control renders
+     as a white box with a blue tick, which is the one piece of default browser
+     chrome loud enough to break the parchment palette. accent-color alone
+     only tints the checked state and leaves the unchecked box white, so the
+     control is rebuilt from scratch. Sizing stays at 15px so the hit target
+     matches what the browser would have drawn. */
+  .comp-check {{
+    appearance: none;
+    -webkit-appearance: none;
+    flex: none;
+    width: 15px;
+    height: 15px;
+    border: 1px solid var(--border-bright);
+    background: var(--bg);
+    cursor: pointer;
+    position: relative;
+    transition: border-color .15s, background .15s;
+  }}
+  .comp-check:hover {{ border-color: var(--gold); }}
+  .comp-check:checked {{ border-color: var(--gold); background: var(--gold-dim); }}
+  .comp-check:checked::after {{
+    content: "";
+    position: absolute;
+    left: 4px;
+    top: 0px;
+    width: 4px;
+    height: 9px;
+    border: solid var(--gold-bright);
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+  }}
+  .comp-check:focus-visible {{ outline: 1px solid var(--gold-bright); outline-offset: 2px; }}
+
   * {{ box-sizing: border-box; margin: 0; padding: 0; }}
   html {{
     scrollbar-width: thin;
@@ -4716,6 +4749,24 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
     color: var(--text-muted); font-size: 0.82rem; line-height: 1.6;
     margin: 7px 0 0; white-space: pre-wrap; word-break: break-word;
   }}
+  /* Patch-note groups. The heading carries the weight so the eye can jump
+     between "Added" and "Fixed" without reading the entries under them. */
+  .fb-notes-head {{
+    color: var(--gold); font-size: 0.74rem; letter-spacing: 0.08em;
+    text-transform: uppercase; margin: 12px 0 4px;
+  }}
+  .fb-notes-head:first-child {{ margin-top: 8px; }}
+  .fb-notes-list {{
+    margin: 0; padding: 0; list-style: none;
+    color: var(--text-muted); font-size: 0.82rem; line-height: 1.55;
+  }}
+  .fb-notes-list li {{
+    position: relative; padding: 2px 0 2px 14px; word-break: break-word;
+  }}
+  .fb-notes-list li::before {{
+    content: ""; position: absolute; left: 3px; top: 0.72em;
+    width: 4px; height: 4px; background: var(--gold-dim);
+  }}
 
   @media (max-width: 760px) {{
     .fb-panel {{ margin: 16px auto; padding: 18px; }}
@@ -6039,10 +6090,13 @@ function renderSettings(holder, data, composition) {{
     renderComposition(holder, composition);
   }}
 
-  const account = settingsRow(holder, 'Switch character');
+  const account = settingsRow(holder, 'Build a different character');
   const current = document.createElement('p');
-  current.className = 'fb-release-notes';
-  current.textContent = 'Building a different character starts its own dashboard, with its own history. It does not combine with this one.';
+  const currentName = composition && composition.ok ? composition.current : data.current;
+  current.className = 'fb-note';
+  current.textContent = 'This is not the same as the question above. Ticking a folder there adds it to ' + currentName +
+    ' as a former name. Choosing a character here leaves ' + currentName +
+    ' behind and builds that one instead, as its own dashboard with its own history and hiscores. Nothing is combined, and nothing is lost — you can come back.';
   account.appendChild(current);
 
   const partOf = composition && composition.ok
@@ -6050,6 +6104,13 @@ function renderSettings(holder, data, composition) {{
     : [data.current];
   const others = (data.options || []).filter(name => partOf.indexOf(name) === -1);
   if (others.length) {{
+    // Collapsed: on a machine with a dozen folders this was a wall of buttons
+    // directly under the composition list, and the two read as one control.
+    const wrap = document.createElement('details');
+    const openIt = document.createElement('summary');
+    openIt.style.cssText = 'cursor:pointer;font-size:.8rem;opacity:.75;margin:8px 0';
+    openIt.textContent = 'Show other characters (' + others.length + ')';
+    wrap.appendChild(openIt);
     const picker = document.createElement('div');
     picker.className = 'fb-actions';
     picker.style.justifyContent = 'flex-start';
@@ -6057,11 +6118,12 @@ function renderSettings(holder, data, composition) {{
     others.forEach(name => {{
       const button = document.createElement('button');
       button.className = 'feedback-btn';
-      button.textContent = 'Switch to ' + name;
-      button.onclick = () => switchCharacter(name, account, data.current);
+      button.textContent = name;
+      button.onclick = () => switchCharacter(name, account, currentName);
       picker.appendChild(button);
     }});
-    account.appendChild(picker);
+    wrap.appendChild(picker);
+    account.appendChild(wrap);
   }} else {{
     const only = document.createElement('p');
     only.className = 'fb-note';
@@ -6102,14 +6164,38 @@ function renderComposition(holder, comp) {{
   const chosen = {{}};
   (comp.also || []).forEach(name => {{ chosen[name] = true; }});
 
-  const section = settingsRow(holder, 'This dashboard');
+  const section = settingsRow(holder, 'Your character');
+
+  // Name the primary first and say what it controls. Without this the panel
+  // opened straight into a list of folders with nothing stating what they were
+  // relative to, which read as a second character switcher sitting above the
+  // real one.
+  const primary = document.createElement('p');
+  primary.className = 'fb-release-notes';
+  primary.style.cssText = 'font-size:1.05rem;margin-bottom:2px';
+  primary.textContent = comp.current;
+  section.appendChild(primary);
+
+  const primaryNote = document.createElement('p');
+  primaryNote.className = 'fb-note';
+  primaryNote.style.marginTop = '0';
+  primaryNote.textContent = 'Your current account name, and the one looked up on the hiscores. Levels, XP, Road to Max and pace all come from this name.';
+  section.appendChild(primaryNote);
+
   const summary = document.createElement('p');
   summary.className = 'fb-release-notes';
   section.appendChild(summary);
 
+  const heading = document.createElement('p');
+  heading.className = 'fb-release-notes';
+  heading.style.cssText = 'margin-top:14px;margin-bottom:2px';
+  heading.textContent = 'Has ' + comp.current + ' had other names?';
+  section.appendChild(heading);
+
   const intro = document.createElement('p');
   intro.className = 'fb-note';
-  intro.textContent = 'This app tells one account story. If your character has had other names, include those folders so nothing is left out. If the folders are not really the same account, most of the numbers here will be wrong.';
+  intro.style.marginTop = '0';
+  intro.textContent = 'RuneLite starts a new folder when you change your name. Tick any folder below that was this same character, and its screenshots join the story above. Leave the rest alone — anything unticked stays a separate account.';
   section.appendChild(intro);
 
   const list = document.createElement('div');
@@ -6128,6 +6214,7 @@ function renderComposition(holder, comp) {{
   section.appendChild(warn);
   const ack = document.createElement('input');
   ack.type = 'checkbox';
+  ack.className = 'comp-check';
 
   const actions = document.createElement('div');
   actions.className = 'fb-actions';
@@ -6153,8 +6240,8 @@ function renderComposition(holder, comp) {{
     const modeCount = Object.keys(modes).length;
     const extra = selectedNames().length;
     summary.textContent = extra
-      ? comp.current + ' plus ' + extra + ' other folder' + (extra > 1 ? 's' : '') + ' — ' + compShots(total)
-      : comp.current + ' on its own — ' + compShots(total);
+      ? 'Built from ' + comp.current + ' plus ' + extra + ' other folder' + (extra > 1 ? 's' : '') + ' — ' + compShots(total)
+      : 'Built from ' + comp.current + ' alone — ' + compShots(total);
 
     if (modeCount > 1) {{
       warn.style.display = '';
@@ -6185,6 +6272,7 @@ function renderComposition(holder, comp) {{
     label.style.cssText = 'display:flex;align-items:center;gap:9px;padding:6px 2px;cursor:pointer;font-size:.9rem';
     const box = document.createElement('input');
     box.type = 'checkbox';
+    box.className = 'comp-check';
     box.checked = !!chosen[folder.name];
     box.onchange = () => {{ chosen[folder.name] = box.checked; update(); }};
     label.appendChild(box);
@@ -6362,6 +6450,66 @@ async function openWhatsNew() {{
   renderReleases(holder, payload);
 }}
 
+function renderNotes(wrap, raw) {{
+  // Release notes are patch notes: a few headed groups of one-line entries,
+  // written to be skimmed. Just enough Markdown is understood to render that
+  // shape — a heading line, and bullets under it. Anything else stays a
+  // paragraph, so a release written as prose still reads correctly.
+  //
+  // Everything goes in through textContent. The body of a GitHub release is
+  // remote text, and it is never worth turning that into markup here.
+  const plain = value => value.replace(/[*_`]/g, '').trim();
+  let list = null;
+  let paragraph = null;
+
+  const endParagraph = () => {{ paragraph = null; }};
+
+  raw.trim().split(/\\r?\\n/).forEach(line => {{
+    const text = line.trim();
+    if (!text) {{ list = null; endParagraph(); return; }}
+
+    // A markdown heading, or a line that is nothing but bold text — both are
+    // used as group titles in practice and both should read as one.
+    const heading = text.match(/^#{{1,6}}\\s+(.*)$/) || text.match(/^\\*\\*(.+)\\*\\*$/);
+    if (heading) {{
+      const h = document.createElement('p');
+      h.className = 'fb-notes-head';
+      h.textContent = plain(heading[1]);
+      wrap.appendChild(h);
+      list = null;
+      endParagraph();
+      return;
+    }}
+
+    const bullet = text.match(/^[-*\\u2022]\\s+(.*)$/);
+    if (bullet) {{
+      if (!list) {{
+        list = document.createElement('ul');
+        list.className = 'fb-notes-list';
+        wrap.appendChild(list);
+      }}
+      const li = document.createElement('li');
+      li.textContent = plain(bullet[1]);
+      list.appendChild(li);
+      endParagraph();
+      return;
+    }}
+
+    // Wrapped prose is one paragraph until a blank line, not one paragraph per
+    // line — older releases were written that way and would otherwise gain a
+    // gap in the middle of a sentence.
+    if (paragraph) {{
+      paragraph.textContent = paragraph.textContent + ' ' + plain(text);
+    }} else {{
+      paragraph = document.createElement('p');
+      paragraph.className = 'fb-release-notes';
+      paragraph.textContent = plain(text);
+      wrap.appendChild(paragraph);
+    }}
+    list = null;
+  }});
+}}
+
 function renderReleases(holder, payload) {{
   holder.textContent = '';
   const releases = (payload && payload.releases) || [];
@@ -6396,10 +6544,7 @@ function renderReleases(holder, payload) {{
     }}
     wrap.appendChild(head);
     if (release.notes) {{
-      const notes = document.createElement('p');
-      notes.className = 'fb-release-notes';
-      notes.textContent = release.notes.trim();
-      wrap.appendChild(notes);
+      renderNotes(wrap, release.notes);
     }}
     holder.appendChild(wrap);
   }});
