@@ -44,6 +44,7 @@ if errorlevel 1 (
 :: Before touching this line, read DESIGN.md and GitHub issue #2.
 python -m PyInstaller --onefile --windowed ^
   --name "OSRS Dashboard" ^
+  --icon "%~dp0..\_engine\icon.ico" ^
   --hidden-import version ^
   --hidden-import console ^
   --hidden-import settings ^
