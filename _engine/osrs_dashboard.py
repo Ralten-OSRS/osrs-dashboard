@@ -23,7 +23,7 @@ from datetime import datetime, timedelta
 from collections import defaultdict
 from urllib.request import urlopen
 from urllib.parse import quote
-from urllib.error import URLError
+from urllib.error import HTTPError, URLError
 
 from economic_value import resolve_economic_value
 from value_recipes import VALUE_RECIPES
@@ -276,6 +276,36 @@ def _read_xp_history_file(path):
     except (OSError, ValueError):
         return []
     return history if isinstance(history, list) else []
+
+
+def warn_if_name_is_stale(hiscores, xp_history, player_name):
+    """Say so when the chosen folder's name no longer exists on the hiscores.
+
+    This is the failure the rename feature itself can cause: pick an older
+    folder as the current one and every refresh quietly stops collecting XP,
+    because the hiscores only answer for the name the account has now. The
+    dashboard still builds and still looks right, so nothing announces it.
+
+    Existing history is what separates the two cases. A name that has been
+    answering for months and stops has almost certainly been renamed; a name
+    that never answered at all is more likely the wrong folder or a typo.
+    """
+    if (hiscores or {}).get("lookup") != "not_found":
+        return False
+    print()
+    if xp_history:
+        last = xp_history[-1].get("date", "an earlier date")
+        print(f"  '{player_name}' no longer appears on the hiscores, but this account")
+        print(f"  has XP history up to {last}. That usually means the character was")
+        print("  renamed. Your screenshots and history are safe, but no new XP will be")
+        print("  recorded until you build from the folder with your current name and")
+        print(f"  declare '{player_name}' as a former name in Settings.")
+    else:
+        print(f"  '{player_name}' does not appear on the hiscores, so levels, Road to Max")
+        print("  and pace tracking will be empty. Check that this folder is named exactly")
+        print("  as your character is in game.")
+    print()
+    return True
 
 
 def merge_xp_history(primary_history, merge_folders=None):
@@ -641,12 +671,22 @@ def fetch_hiscores(player_name, debug=False):
         result = parse_hiscores_payload(payload)
         print(f"Skills: {len(result['skills'])} | Bosses with KC: {len(result['bosses'])} | Clues: {len(result['clues'])}")
         return result
+    except HTTPError as e:
+        # 404 means the hiscores have no such player, which is a different
+        # problem from being offline and has a different fix. Distinguishing
+        # them is what lets a renamed account be told it has renamed instead
+        # of being told the network is down.
+        if e.code == 404:
+            print(f"The hiscores have no player named '{player_name}'.")
+            return {"skills": {}, "clues": {}, "bosses": {}, "boss_names": [], "lookup": "not_found"}
+        print(f"Could not fetch hiscores: {e}. Using screenshot data instead.")
+        return {"skills": {}, "clues": {}, "bosses": {}, "boss_names": [], "lookup": "unreachable"}
     except URLError as e:
         print(f"Could not fetch hiscores: {e}. Using screenshot data instead.")
-        return {"skills": {}, "clues": {}, "bosses": {}, "boss_names": []}
+        return {"skills": {}, "clues": {}, "bosses": {}, "boss_names": [], "lookup": "unreachable"}
     except Exception as e:
         print(f"Hiscores parse error: {e}. Using screenshot data instead.")
-        return {"skills": {}, "clues": {}, "bosses": {}, "boss_names": []}
+        return {"skills": {}, "clues": {}, "bosses": {}, "boss_names": [], "lookup": "error"}
 
 # NOTE: HISCORES_ACTIVITIES list is intentionally not maintained. We now use the
 # JSON hiscores endpoint, which keys every activity by name, so positional drift
@@ -7211,6 +7251,7 @@ def generate_dashboard():
     hiscores = fetch_hiscores(PLAYER_NAME, debug=False)
     newly_seen_bosses = update_known_bosses(hiscores.get("boss_names", []))
     xp_history = merge_xp_history(update_xp_history(hiscores), MERGE_FOLDERS)
+    warn_if_name_is_stale(hiscores, xp_history, PLAYER_NAME)
     favorite_paths = load_all_favorites(SCREENSHOTS_PATH, MERGE_FOLDERS)
     acquisitions = build_economic_acquisitions(data, VALUE_COMPONENT_OVERRIDES)
     if FORCE_BOSS_DATA_REFRESH:
