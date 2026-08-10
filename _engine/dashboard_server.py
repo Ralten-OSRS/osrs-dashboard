@@ -166,11 +166,70 @@ SETUP_PAGE = """<!DOCTYPE html>
   .go:hover { border-color:var(--gold); }
   .err { color:var(--red); font-size:.84rem; margin:12px 0 0; min-height:1em; }
   .hint { color:var(--dim); font-size:.8rem; margin:16px 0 0; line-height:1.55; }
+  .step { margin-top:22px; }
+  .step h2 { font-size:.95rem; color:var(--gold-bright); font-weight:600; margin:0 0 4px; }
+  .step p { margin:0 0 10px; color:var(--dim); font-size:.82rem; line-height:1.55; }
+  button.pick.chosen { background:#1c160a; border-color:var(--bright); color:var(--gold-bright); }
+  label.opt { display:flex; align-items:center; gap:10px; padding:10px 14px; cursor:pointer;
+    border:1px solid transparent; color:var(--text); font-size:.92rem; }
+  label.opt:hover { background:#18150e; border-color:#3f331e; }
+  label.opt input { flex:none; width:15px; height:15px; accent-color:var(--gold); }
+  label.opt .meta { margin-left:auto; color:var(--dim); font-size:.75rem; }
+  label.opt .tag { color:var(--gold); font-size:.7rem; border:1px solid var(--bright);
+    padding:1px 6px; letter-spacing:.4px; }
+  .disclose { margin-top:10px; }
+  .disclose summary { cursor:pointer; color:var(--dim); font-size:.8rem; padding:8px 14px;
+    list-style:none; }
+  .disclose summary::-webkit-details-marker { display:none; }
+  .disclose summary:hover { color:var(--gold-bright); }
+  .warn { border:1px solid var(--red); background:#1a0d0a; padding:12px 14px; margin-top:14px;
+    font-size:.82rem; line-height:1.6; }
+  .warn strong { color:var(--red); display:block; margin-bottom:4px; }
+  .warn ul { margin:6px 0 0; padding-left:18px; }
+  .warn label { display:flex; gap:8px; align-items:flex-start; margin-top:10px;
+    color:var(--text); cursor:pointer; }
+  .actions { margin-top:18px; display:flex; gap:10px; align-items:center; }
+  .primary { padding:11px 20px; background:#1c160a; border:1px solid var(--bright);
+    color:var(--gold-bright); font-family:inherit; font-size:.9rem; cursor:pointer; }
+  .primary:hover:not(:disabled) { border-color:var(--gold); }
+  .primary:disabled { opacity:.45; cursor:not-allowed; }
 </style></head>
 <body><div class="wrap">
   <h1>Choose your character</h1>
   <p class="sub" id="sub">Loading...</p>
   <div class="card" id="list" style="display:none"></div>
+
+  <div class="step" id="step2" style="display:none">
+    <h2>Has this character had other names?</h2>
+    <p>RuneLite makes a new folder when you change your name, so an older name&#39;s
+       screenshots sit apart from your current ones. Tick any that were the same
+       character and they become one story: one dashboard, one history, one timeline.
+       Leave them unticked if you are not sure &mdash; you can change this later.</p>
+    <div class="card" id="others"></div>
+    <details class="disclose" id="modeWrap" style="display:none">
+      <summary id="modeSummary">Show other game modes</summary>
+      <div class="card" id="modes"></div>
+    </details>
+    <div class="warn" id="warn" style="display:none">
+      <strong>These are different game modes.</strong>
+      <span id="warnText"></span>
+      <ul>
+        <li>Wealth totals will include loot that was never on your main.</li>
+        <li>Pace and Road to Max will be distorted by borrowed XP.</li>
+        <li>Hiscores only ever answer for your current main character.</li>
+      </ul>
+      Your screenshots, Chronicle and Gallery stay accurate &mdash; so this is a
+      reasonable way to browse everything you have ever done, as long as you do not
+      read the numbers as your main account&#39;s.
+      <label><input type="checkbox" id="ack"> I understand these numbers will be mixed.</label>
+    </div>
+  </div>
+
+  <div class="actions" id="actions" style="display:none">
+    <button class="primary" id="go" onclick="submitChoice()">Build my dashboard</button>
+    <span class="meta" id="summary" style="color:var(--dim);font-size:.8rem"></span>
+  </div>
+
   <div class="manual" id="manual" style="display:none">
     <label for="path">Or paste the full path to your character&#39;s screenshot folder</label>
     <div class="row">
@@ -183,6 +242,94 @@ SETUP_PAGE = """<!DOCTYPE html>
 </div>
 <script>
 var errEl = document.getElementById('err');
+var FOLDERS = [];
+var current = null;
+var picked = {};
+
+function byName(name) {
+  for (var i = 0; i < FOLDERS.length; i++) { if (FOLDERS[i].name === name) return FOLDERS[i]; }
+  return null;
+}
+function shotLabel(n) { return n === 1 ? '1 screenshot' : n.toLocaleString() + ' screenshots'; }
+
+function selectedModes() {
+  var modes = {}, names = [current];
+  for (var n in picked) { if (picked[n]) names.push(n); }
+  names.forEach(function (n) { var f = byName(n); if (f) modes[f.mode] = true; });
+  return Object.keys(modes);
+}
+
+function option(folder, container) {
+  var label = document.createElement('label');
+  label.className = 'opt';
+  var box = document.createElement('input');
+  box.type = 'checkbox';
+  box.checked = !!picked[folder.name];
+  box.onchange = function () { picked[folder.name] = box.checked; refresh(); };
+  label.appendChild(box);
+  label.appendChild(document.createTextNode(folder.name));
+  if (folder.mode) {
+    var tag = document.createElement('span');
+    tag.className = 'tag';
+    tag.textContent = folder.mode;
+    label.appendChild(tag);
+  }
+  var meta = document.createElement('span');
+  meta.className = 'meta';
+  meta.textContent = shotLabel(folder.shots);
+  label.appendChild(meta);
+  container.appendChild(label);
+}
+
+function refresh() {
+  var modes = selectedModes();
+  var mixed = modes.length > 1;
+  document.getElementById('warn').style.display = mixed ? '' : 'none';
+  if (mixed) {
+    document.getElementById('warnText').textContent =
+      'You have selected folders from ' + modes.length + ' different game modes.';
+  } else {
+    document.getElementById('ack').checked = false;
+  }
+  var chosen = Object.keys(picked).filter(function (n) { return picked[n]; });
+  var total = (byName(current) || {shots: 0}).shots;
+  chosen.forEach(function (n) { var f = byName(n); if (f) total += f.shots; });
+  document.getElementById('summary').textContent =
+    chosen.length
+      ? current + ' plus ' + chosen.length + ' other folder' + (chosen.length > 1 ? 's' : '') +
+        ' — ' + shotLabel(total)
+      : current + ' — ' + shotLabel(total);
+  document.getElementById('go').disabled = mixed && !document.getElementById('ack').checked;
+}
+
+function pickCurrent(name, button) {
+  current = name;
+  picked = {};
+  Array.prototype.forEach.call(document.querySelectorAll('button.pick'), function (b) {
+    b.classList.toggle('chosen', b === button);
+  });
+  var others = document.getElementById('others');
+  var modes = document.getElementById('modes');
+  others.innerHTML = '';
+  modes.innerHTML = '';
+  var modeCount = 0, otherCount = 0;
+  FOLDERS.forEach(function (f) {
+    if (f.name === name) return;
+    if (f.mode) { option(f, modes); modeCount++; } else { option(f, others); otherCount++; }
+  });
+  if (!otherCount) {
+    var none = document.createElement('p');
+    none.style.cssText = 'margin:0;padding:12px 14px;color:var(--dim);font-size:.82rem';
+    none.textContent = 'No other folders found under a different name.';
+    others.appendChild(none);
+  }
+  document.getElementById('modeWrap').style.display = modeCount ? '' : 'none';
+  document.getElementById('modeSummary').textContent =
+    'Show other game modes (' + modeCount + ')';
+  document.getElementById('step2').style.display = '';
+  document.getElementById('actions').style.display = '';
+  refresh();
+}
 
 async function load() {
   var data;
@@ -193,19 +340,20 @@ async function load() {
     return;
   }
   var list = document.getElementById('list');
-  var chars = data.characters || [];
-  if (chars.length) {
+  FOLDERS = data.folders || [];
+  if (FOLDERS.length) {
     document.getElementById('sub').textContent =
-      'These are the characters RuneLite has saved screenshots for. This is remembered, so you only pick once.';
-    chars.forEach(function (name) {
+      'This app tells one account\\u2019s story. Pick the character you play now \\u2014 ' +
+      'if it has had other names, you can add those next so nothing is left out. ' +
+      'This is remembered, so you only do it once.';
+    FOLDERS.forEach(function (f) {
       var b = document.createElement('button');
       b.className = 'pick';
-      b.innerHTML = '';
-      b.appendChild(document.createTextNode(name));
+      b.appendChild(document.createTextNode(f.name));
       var s = document.createElement('span');
-      s.textContent = 'Use this';
+      s.textContent = shotLabel(f.shots);
       b.appendChild(s);
-      b.onclick = function () { choose({folder: name}, b); };
+      b.onclick = function () { pickCurrent(f.name, b); };
       list.appendChild(b);
     });
     list.style.display = '';
@@ -242,6 +390,16 @@ async function choose(body, button) {
   if (button) { button.disabled = false; }
 }
 
+function submitChoice() {
+  if (!current) return;
+  var also = Object.keys(picked).filter(function (n) { return picked[n]; });
+  choose({
+    folder: current,
+    also_folders: also,
+    acknowledged: document.getElementById('ack').checked
+  }, document.getElementById('go'));
+}
+
 function submitPath() {
   var value = document.getElementById('path').value.trim();
   if (!value) { document.getElementById('path').focus(); return; }
@@ -251,6 +409,7 @@ function submitPath() {
 document.getElementById('path').addEventListener('keydown', function (e) {
   if (e.key === 'Enter') submitPath();
 });
+document.getElementById('ack').addEventListener('change', refresh);
 load();
 </script></body></html>
 """
@@ -282,6 +441,10 @@ class DashboardHTTPServer(ThreadingHTTPServer):
         # Set when the service comes up before a character has been chosen.
         # on_account_chosen is supplied by the launcher and binds the engine.
         self.setup_base = None
+        # Folders the setup page declared as former names, handed to the
+        # launcher's callback so the engine is bound to the whole account
+        # rather than only the folder that was clicked.
+        self.pending_also_folders = []
         self.on_account_chosen = None
 
     def set_build_setup(self):
@@ -410,6 +573,63 @@ class DashboardHTTPServer(ThreadingHTTPServer):
             self.shutdown()
 
 
+def _count_screenshots(folder, cap=100000):
+    total = 0
+    for _ in folder.rglob("*.png"):
+        total += 1
+        if total >= cap:
+            break
+    return total
+
+
+def folder_inventory(base):
+    """Every screenshot folder under `base`, with a mode hint where one is evident.
+
+    RuneLite names a folder `<account>-<world type>`, so `Ralten-Beta` and
+    `Ralten-Raging Echoes League` are the same character in a different game
+    mode. This does not hardcode that vocabulary — there is no list of league
+    names here, deliberately, because the naming belongs to RuneLite and this
+    project has already been broken once by depending on it.
+
+    Instead the hint is drawn from the folder set itself: a name is treated as
+    a possible mode only when the part before its first hyphen is *also* a
+    real folder. That is evidence rather than a guess, and when it is wrong or
+    absent the user simply sees an ordinary folder and ticks it themselves.
+    Nothing stored depends on this; it only decides what the page collapses.
+    """
+    base = Path(base) if base else None
+    if base is None or not base.is_dir():
+        return []
+    try:
+        folders = [p for p in sorted(base.iterdir(), key=lambda p: p.name.lower()) if p.is_dir()]
+    except OSError:
+        return []
+
+    known = {p.name.lower() for p in folders}
+    inventory = []
+    for folder in folders:
+        shots = _count_screenshots(folder)
+        if not shots:
+            continue
+        family, mode = folder.name, ""
+        head, sep, tail = folder.name.partition("-")
+        if sep and tail.strip() and head.lower() in known:
+            family, mode = head, tail.strip()
+        inventory.append({
+            "name": folder.name,
+            "shots": shots,
+            "family": family,
+            "mode": mode,
+        })
+    return inventory
+
+
+def _modes_in(selection, inventory):
+    """How many distinct game modes a chosen set of folders spans."""
+    by_name = {item["name"]: item for item in inventory}
+    return {by_name[name]["mode"] for name in selection if name in by_name}
+
+
 def _safe_segments(parts):
     """Path segments with nothing that could climb out of a folder.
 
@@ -475,6 +695,42 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             return json.loads(self.rfile.read(length).decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError):
             return None
+
+    def _validated_composition(self, target, payload, base):
+        """Check the declared merge list. Returns (folders, error_message).
+
+        Two things are enforced here rather than only in the page. Every name
+        must be a real sibling folder, because a name arriving over the wire is
+        data. And a set spanning more than one game mode must carry an explicit
+        acknowledgement, because that combination knowingly breaks wealth, pace
+        and hiscores — DESIGN.md says the user may do it, and equally that they
+        must be told first. A page that skipped the warning would otherwise be
+        able to skip the consequence.
+        """
+        raw = payload.get("also_folders")
+        if raw in (None, []):
+            return [], None
+        if not isinstance(raw, list):
+            return None, "Invalid folder selection."
+
+        also = []
+        for name in raw:
+            if not isinstance(name, str) or not name.strip():
+                return None, "Invalid folder selection."
+            name = name.strip()
+            if name in (".", "..") or "/" in name or "\\" in name:
+                return None, "Invalid folder selection."
+            if name == target.name or name in also:
+                continue
+            if not (base / name).is_dir():
+                return None, f"The folder '{name}' could not be found."
+            also.append(name)
+
+        inventory = folder_inventory(base)
+        if len(_modes_in([target.name] + also, inventory)) > 1 and not payload.get("acknowledged"):
+            return None, ("Combining different game modes changes what the numbers mean. "
+                          "Please confirm you understand before continuing.")
+        return also, None
 
     def _all_favorites(self):
         engine = self.server.engine
@@ -725,19 +981,32 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
             return
         if route == "/api/setup":
             base = self.server.setup_base
-            found = []
-            if base is not None:
-                try:
-                    for entry in sorted(Path(base).iterdir(), key=lambda p: p.name.lower()):
-                        if entry.is_dir() and next(entry.rglob("*.png"), None) is not None:
-                            found.append(entry.name)
-                except OSError:
-                    pass
+            inventory = folder_inventory(base)
             self._send_json(200, {
                 "ok": True,
                 "base": str(base) if base else "",
                 "base_exists": bool(base and Path(base).is_dir()),
-                "characters": found,
+                # Kept for older generated pages that read a flat name list.
+                "characters": [item["name"] for item in inventory],
+                "folders": inventory,
+                "current": None,
+                "also": [],
+            })
+            return
+        if route == "/api/composition":
+            # The same question the setup screen asks, reachable afterwards so
+            # the account stays recomposable. Reports what is in the dashboard
+            # right now alongside everything available.
+            import settings as user_settings
+            base = self.server.root.parent
+            record = user_settings.get_account(user_settings.load(), self.server.root.name)
+            self._send_json(200, {
+                "ok": True,
+                "base": str(base),
+                "base_exists": base.is_dir(),
+                "folders": folder_inventory(base),
+                "current": self.server.root.name,
+                "also": list(record["also_folders"]) if record else [],
             })
             return
         if route == "/api/settings":
@@ -868,6 +1137,13 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 self._send_json(400, {"ok": False, "message": "That folder could not be found."})
                 return
             target = target.resolve()
+
+            also, error = self._validated_composition(target, payload, Path(base) if base else target.parent)
+            if error:
+                self._send_json(400, {"ok": False, "message": error})
+                return
+            self.server.pending_also_folders = also
+
             try:
                 self.server.on_account_chosen(target)
             except Exception as exc:  # noqa: BLE001 - report instead of dying
@@ -876,6 +1152,34 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 self._send_json(500, {"ok": False, "message": f"{type(exc).__name__}: {exc}"})
                 return
             self._send_json(200, {"ok": True, "character": target.name})
+            return
+
+        if route == "/api/composition":
+            import settings as user_settings
+
+            base = self.server.root.parent
+            also, error = self._validated_composition(self.server.root, payload, base)
+            if error:
+                self._send_json(400, {"ok": False, "message": error})
+                return
+
+            record = user_settings.describe_account(self.server.root.name, also_folders=also)
+            folders = user_settings.account_folders(record, base)
+            merges = [str(path) for path in folders[1:]]
+
+            # Applied live rather than deferred to the next launch. The engine
+            # reads these at build time, and the page already has a Refresh
+            # button, so re-pointing both here turns "change what is included"
+            # into one extra click instead of a restart.
+            self.server.engine.MERGE_FOLDERS = merges
+            self.server.set_roots(self.server.engine.SCREENSHOTS_PATH, merges)
+
+            self._send_json(200, {
+                "ok": True,
+                "current": self.server.root.name,
+                "also": list(record["also_folders"]),
+                "refresh_required": True,
+            })
             return
 
         if route == "/api/settings/character":
@@ -962,7 +1266,7 @@ def serve_dashboard(engine, open_browser=True, build_first=True,
         server.set_build_setup()
 
         def account_chosen(path):
-            on_account_chosen(path)
+            on_account_chosen(path, server.pending_also_folders)
             # Re-declare both the root and the merge folders together. Setting
             # the root alone would leave the previous account's folders
             # routable, which is the leak the engine-side reset also guards.

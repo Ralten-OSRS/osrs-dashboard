@@ -6001,11 +6001,14 @@ async function openSettings() {{
   holder.textContent = 'Loading...';
   document.getElementById('fb-modal').classList.add('open');
   let data = null;
+  let composition = null;
   try {{
     const response = await fetch('/api/settings', {{cache: 'no-store'}});
     if (response.ok) data = await response.json();
+    const compResponse = await fetch('/api/composition', {{cache: 'no-store'}});
+    if (compResponse.ok) composition = await compResponse.json();
   }} catch (_error) {{ /* handled below */ }}
-  renderSettings(holder, data);
+  renderSettings(holder, data, composition);
 }}
 
 function settingsRow(holder, label) {{
@@ -6022,7 +6025,7 @@ function settingsRow(holder, label) {{
   return wrap;
 }}
 
-function renderSettings(holder, data) {{
+function renderSettings(holder, data, composition) {{
   holder.textContent = '';
   if (!data || !data.ok) {{
     const note = document.createElement('p');
@@ -6032,13 +6035,20 @@ function renderSettings(holder, data) {{
     return;
   }}
 
-  const account = settingsRow(holder, 'Character');
+  if (composition && composition.ok) {{
+    renderComposition(holder, composition);
+  }}
+
+  const account = settingsRow(holder, 'Switch character');
   const current = document.createElement('p');
   current.className = 'fb-release-notes';
-  current.textContent = 'Currently showing ' + data.current + '.';
+  current.textContent = 'Building a different character starts its own dashboard, with its own history. It does not combine with this one.';
   account.appendChild(current);
 
-  const others = (data.options || []).filter(name => name !== data.current);
+  const partOf = composition && composition.ok
+    ? [composition.current].concat(composition.also || [])
+    : [data.current];
+  const others = (data.options || []).filter(name => partOf.indexOf(name) === -1);
   if (others.length) {{
     const picker = document.createElement('div');
     picker.className = 'fb-actions';
@@ -6080,6 +6090,159 @@ function renderSettings(holder, data) {{
   filesNote.textContent = 'Log: ' + (data.log || 'unavailable') +
     String.fromCharCode(10) + 'Settings: ' + (data.settings_file || 'unavailable');
   files.appendChild(filesNote);
+}}
+
+function compShots(n) {{
+  return n === 1 ? '1 screenshot' : n.toLocaleString() + ' screenshots';
+}}
+
+function renderComposition(holder, comp) {{
+  const folders = comp.folders || [];
+  const find = name => folders.filter(f => f.name === name)[0] || null;
+  const chosen = {{}};
+  (comp.also || []).forEach(name => {{ chosen[name] = true; }});
+
+  const section = settingsRow(holder, 'This dashboard');
+  const summary = document.createElement('p');
+  summary.className = 'fb-release-notes';
+  section.appendChild(summary);
+
+  const intro = document.createElement('p');
+  intro.className = 'fb-note';
+  intro.textContent = 'This app tells one account story. If your character has had other names, include those folders so nothing is left out. If the folders are not really the same account, most of the numbers here will be wrong.';
+  section.appendChild(intro);
+
+  const list = document.createElement('div');
+  section.appendChild(list);
+  const modeWrap = document.createElement('details');
+  const modeSummary = document.createElement('summary');
+  modeSummary.style.cssText = 'cursor:pointer;font-size:.8rem;opacity:.75;margin:6px 0';
+  modeWrap.appendChild(modeSummary);
+  const modeList = document.createElement('div');
+  modeWrap.appendChild(modeList);
+  section.appendChild(modeWrap);
+
+  const warn = document.createElement('div');
+  warn.className = 'fb-note';
+  warn.style.cssText = 'border:1px solid #c96a5a;padding:10px 12px;margin-top:10px;display:none';
+  section.appendChild(warn);
+  const ack = document.createElement('input');
+  ack.type = 'checkbox';
+
+  const actions = document.createElement('div');
+  actions.className = 'fb-actions';
+  actions.style.justifyContent = 'flex-start';
+  const save = document.createElement('button');
+  save.className = 'feedback-btn';
+  save.textContent = 'Save and refresh';
+  actions.appendChild(save);
+  section.appendChild(actions);
+
+  function selectedNames() {{
+    return Object.keys(chosen).filter(name => chosen[name]);
+  }}
+
+  function update() {{
+    const names = [comp.current].concat(selectedNames());
+    const modes = {{}};
+    let total = 0;
+    names.forEach(name => {{
+      const f = find(name);
+      if (f) {{ modes[f.mode] = true; total += f.shots; }}
+    }});
+    const modeCount = Object.keys(modes).length;
+    const extra = selectedNames().length;
+    summary.textContent = extra
+      ? comp.current + ' plus ' + extra + ' other folder' + (extra > 1 ? 's' : '') + ' — ' + compShots(total)
+      : comp.current + ' on its own — ' + compShots(total);
+
+    if (modeCount > 1) {{
+      warn.style.display = '';
+      warn.textContent = '';
+      const head = document.createElement('strong');
+      head.style.color = '#c96a5a';
+      head.textContent = 'This mixes ' + modeCount + ' different game modes. ';
+      warn.appendChild(head);
+      warn.appendChild(document.createTextNode(
+        'Wealth totals will include loot that was never on your main, pace and Road to Max will be distorted, and the hiscores only answer for your current character. Screenshots, Chronicle and Gallery stay accurate, so this is a fine way to browse everything you have done — just do not read the numbers as your main account.'));
+      const ackLabel = document.createElement('label');
+      ackLabel.style.cssText = 'display:flex;gap:8px;margin-top:8px;cursor:pointer';
+      ackLabel.appendChild(ack);
+      ackLabel.appendChild(document.createTextNode('I understand these numbers will be mixed.'));
+      warn.appendChild(ackLabel);
+      save.disabled = !ack.checked;
+    }} else {{
+      warn.style.display = 'none';
+      ack.checked = false;
+      save.disabled = false;
+    }}
+  }}
+
+  ack.onchange = update;
+
+  function addOption(folder, container) {{
+    const label = document.createElement('label');
+    label.style.cssText = 'display:flex;align-items:center;gap:9px;padding:6px 2px;cursor:pointer;font-size:.9rem';
+    const box = document.createElement('input');
+    box.type = 'checkbox';
+    box.checked = !!chosen[folder.name];
+    box.onchange = () => {{ chosen[folder.name] = box.checked; update(); }};
+    label.appendChild(box);
+    label.appendChild(document.createTextNode(folder.name));
+    if (folder.mode) {{
+      const tag = document.createElement('span');
+      tag.style.cssText = 'font-size:.7rem;opacity:.7;border:1px solid currentColor;padding:0 5px';
+      tag.textContent = folder.mode;
+      label.appendChild(tag);
+    }}
+    const meta = document.createElement('span');
+    meta.style.cssText = 'margin-left:auto;opacity:.6;font-size:.75rem';
+    meta.textContent = compShots(folder.shots);
+    label.appendChild(meta);
+    container.appendChild(label);
+  }}
+
+  let modeCount = 0;
+  let plainCount = 0;
+  folders.forEach(folder => {{
+    if (folder.name === comp.current) return;
+    if (folder.mode) {{ addOption(folder, modeList); modeCount++; }}
+    else {{ addOption(folder, list); plainCount++; }}
+  }});
+  if (!plainCount) {{
+    const none = document.createElement('p');
+    none.className = 'fb-note';
+    none.textContent = 'No other folders found under a different name.';
+    list.appendChild(none);
+  }}
+  modeWrap.style.display = modeCount ? '' : 'none';
+  modeSummary.textContent = 'Show other game modes (' + modeCount + ')';
+
+  save.onclick = async () => {{
+    const note = switchNote(section);
+    note.textContent = 'Saving...';
+    save.disabled = true;
+    try {{
+      const response = await fetch('/api/composition', {{
+        method: 'POST',
+        headers: {{'Content-Type': 'application/json'}},
+        body: JSON.stringify({{also_folders: selectedNames(), acknowledged: ack.checked}})
+      }});
+      const result = await response.json();
+      if (!result.ok) {{
+        note.textContent = result.message || 'That could not be saved.';
+        save.disabled = false;
+        return;
+      }}
+      note.textContent = 'Saved. Rebuilding the dashboard...';
+      refreshDashboard();
+    }} catch (_error) {{
+      note.textContent = 'Could not reach the local service.';
+      save.disabled = false;
+    }}
+  }};
+
+  update();
 }}
 
 function switchNote(container) {{

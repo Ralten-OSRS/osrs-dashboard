@@ -257,10 +257,15 @@ def run():
         # Bind to the base folder for now; the callback re-points everything.
         eng.SCREENSHOTS_PATH = str(setup_base)
 
-        def on_chosen(chosen_path):  # noqa: F811 - deliberate conditional definition
+        def on_chosen(chosen_path, also_folders=()):  # noqa: F811 - deliberate conditional definition
             settings.remember_account(chosen_path.name, display_name=chosen_path.name)
+            # Declaring former names absorbs their old records, so this has to
+            # happen before the engine is bound — the merge list it binds to
+            # comes back out of the settings file.
+            record = settings.describe_account(chosen_path.name, also_folders=list(also_folders))
             console.install(log_path=chosen_path / "dashboard_log.txt")
-            bound = bind_engine(eng, chosen_path, refresh_boss_data)
+            merges = settings.account_folders(record, chosen_path.parent)[1:]
+            bound = bind_engine(eng, chosen_path, refresh_boss_data, merge_folders=merges)
             print(f"\nBuilding the dashboard for {bound}...")
     else:
         # The log lives with the account data, so it can only be opened once
