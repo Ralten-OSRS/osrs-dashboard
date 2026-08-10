@@ -22,6 +22,7 @@ from pathlib import Path
 from datetime import datetime, timedelta
 from collections import defaultdict
 from urllib.request import urlopen
+from urllib.parse import quote
 from urllib.error import URLError
 
 from economic_value import resolve_economic_value
@@ -501,7 +502,14 @@ def fetch_hiscores(player_name, debug=False):
     Clue Scrolls etc.). All matching here is by name, and every non-excluded
     activity is treated as a boss — new bosses are discovered automatically.
     """
-    url = f"https://secure.runescape.com/m=hiscore_oldschool/index_lite.json?player={player_name}"
+    # The name has to be percent-encoded. OSRS names may contain spaces, and an
+    # unencoded space makes urlopen raise "URL can't contain control characters"
+    # — which the broad except below swallows into the screenshot-data fallback.
+    # The result is a silently worse dashboard, with the real cause visible only
+    # in the log file. Found August 10, 2026 in a real account's log ("Hunt N
+    # Gains"); spaces are common in OSRS names, so this affected a large share
+    # of downloaded copies from the first release.
+    url = f"https://secure.runescape.com/m=hiscore_oldschool/index_lite.json?player={quote(player_name, safe='')}"
     try:
         print(f"Fetching hiscores for {player_name}...")
         with urlopen(url, timeout=10) as resp:
