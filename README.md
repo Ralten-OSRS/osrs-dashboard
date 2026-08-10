@@ -30,9 +30,9 @@ Download the latest `OSRS.Dashboard.exe` from the [Releases](../../releases) pag
 
 Windows may show a blue "Windows protected your PC" warning. Click **More info**, then **Run anyway**. That warning appears because the file isn't signed through the Microsoft Store, not because anything is wrong with it. Nothing gets installed.
 
-Your browser opens straight away. If you have more than one character with screenshots, it asks which one you want and remembers the answer, so you only choose once. Then it reads your screenshots, showing progress as it goes, and your dashboard appears when it's done. The first run on a large account takes a minute or so.
+Your browser opens straight away. If you have more than one character with screenshots, it asks which one you play now, and then whether that character has gone by any other names — RuneLite starts a fresh folder every time you change your name, so ticking the old ones brings your whole history into a single dashboard. Both answers are remembered, so you only do this once. Then it reads your screenshots, showing progress as it goes, and your dashboard appears when it's done. The first run on a large account takes a minute or so.
 
-Every run after that goes straight to building. Use the **Refresh** button inside the page to rescan whenever you like, and **Settings** in the sidebar to switch characters or refresh boss data.
+Every run after that goes straight to building. Use the **Refresh** button inside the page to rescan whenever you like, and **Settings** in the sidebar to change which folders make up your account, switch to a different character, or refresh boss data.
 
 There's no terminal and nothing to install. The app closes itself a few seconds after you close the last dashboard tab.
 
