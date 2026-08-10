@@ -140,8 +140,31 @@ ETA_USEFUL_MAX_DAYS = 365 * 3
 ACTIVE_XP_FLOOR = 100_000
 
 
-def load_favorite_paths(path=None):
-    """Return normalized screenshot-relative paths from favorites.json."""
+FAVORITES_SCHEMA_VERSION = 2
+
+
+def favorite_key(folder_name, relative_path):
+    """The stable identity of a screenshot: its folder plus its path inside it.
+
+    Deliberately not the path relative to whichever folder is currently
+    primary. That one changes when the user recomposes the account — the same
+    image is `Boss Kills/x.png` in one composition and `../OldName/Boss
+    Kills/x.png` in another — so keying on it would drop the user's hearts
+    every time they changed their mind (DESIGN.md non-negotiable #16).
+    """
+    return f"{folder_name}/{str(relative_path).replace(chr(92), '/').lstrip('/')}"
+
+
+def load_favorite_paths(path=None, primary_folder=None):
+    """Return stable favorite keys from favorites.json, migrating version 1.
+
+    Version 1 stored paths relative to the account folder, back when an
+    account was always exactly one folder. Every such entry therefore belongs
+    to the primary folder, which makes the upgrade unambiguous. It is applied
+    on read and not written back: a plain refresh has never modified this file
+    and must not start, so the file becomes version 2 the next time the user
+    actually toggles a favorite.
+    """
     favorites_path = Path(path or FAVORITES_FILE)
     try:
         with favorites_path.open("r", encoding="utf-8") as f:
@@ -149,12 +172,31 @@ def load_favorite_paths(path=None):
     except (OSError, json.JSONDecodeError):
         return set()
 
-    raw = payload.get("favorites", []) if isinstance(payload, dict) else []
-    return {
-        str(value).replace("\\", "/")
+    if not isinstance(payload, dict):
+        return set()
+
+    raw = payload.get("favorites", [])
+    values = [
+        str(value).replace("\\", "/").strip()
         for value in raw
         if isinstance(value, str) and value.strip()
-    }
+    ]
+
+    try:
+        version = int(payload.get("version", 1))
+    except (TypeError, ValueError):
+        version = 1
+
+    if version >= FAVORITES_SCHEMA_VERSION:
+        return set(values)
+
+    # Version 1: bare account-relative paths. Without a primary folder name
+    # there is nothing to key them to, so leave them as-is rather than invent
+    # a prefix that would not match anything.
+    folder = primary_folder or Path(SCREENSHOTS_PATH).name
+    if not folder:
+        return set(values)
+    return {favorite_key(folder, value) for value in values}
 
 
 def load_dashboard_asset(name):
@@ -1411,6 +1453,8 @@ def scan_screenshots(base_path, merge_folders=None):
             "filename": item.name,
             "path": str(item),
             "rel_path": rel_path,
+            # Stable across recompositions; `rel_path` is not. See #16.
+            "fav_key": favorite_key(root.name, rel),
             "timestamp": ts,
             "ts_str": ts_str,
             "ts_sort": ts_sort,
@@ -1638,8 +1682,10 @@ def build_this_week_memories(gallery_items, chronicle_events, today=None,
             continue
 
         # Explicit user curation outranks inferred importance while preserving
-        # the anniversary-window contract for This Week in Gielinor.
-        if src in favorite_paths:
+        # the anniversary-window contract for This Week in Gielinor. Matched on
+        # the stable key, not the renderable path, so a recomposed account
+        # keeps promoting the same screenshots.
+        if entry.get("fav_key", "") in favorite_paths:
             score += 200
         score += (window_days - distance) * 2
         years_ago = today.year - ts.year
@@ -2225,6 +2271,9 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
     else:
         pet_html = '<p class="empty-note">No pet screenshots found yet.</p>'
     pets_json = json.dumps(pets_json_data)
+    # The folder every un-prefixed relative path belongs to, so the page
+    # can derive a stable favourite key without every item carrying one.
+    primary_folder_json = json.dumps(Path(SCREENSHOTS_PATH).name)
 
     # Clues — compact stat row. Tier colors follow Destiny's engram rarity:
     # Medium=green, Hard=blue, Elite=purple, Master=gold.
@@ -5663,6 +5712,7 @@ let lbIndex = 0;
 const GALLERY_BATCH_SIZE = 72;
 let galleryVisibleCount = GALLERY_BATCH_SIZE;
 let appInteractive = false;
+const PRIMARY_FOLDER = {primary_folder_json};
 let favoritePaths = new Set();
 let appDiagnostics = {{}};
 let feedbackMode = null;
@@ -6117,7 +6167,16 @@ async function refreshDashboard() {{
 }}
 
 function screenshotPath(item) {{
-  return item && (item.path || item.src) || '';
+  // The favourite key, not the renderable path. A screenshot inside the
+  // primary folder renders as 'Boss Kills/x.png' and one merged in from a
+  // former name renders as '../OldName/Boss Kills/x.png', but both must be
+  // remembered by the same identity whatever the account is composed of.
+  // Deriving it here rather than stamping it onto every item collection means
+  // the gallery, the lightbox and every showcase agree by construction.
+  const src = (item && (item.path || item.src)) || '';
+  if (!src) return '';
+  if (src.indexOf('../') === 0) return src.slice(3);
+  return PRIMARY_FOLDER + '/' + src;
 }}
 
 function makeFavoriteButton(item) {{
@@ -6165,7 +6224,7 @@ function filterGallery(reset = true) {{
   const search = document.getElementById('gallery-search').value.toLowerCase();
   activeItems = GALLERY.filter(item => {{
     const matchCat = activeFilter === 'All'
-      || (activeFilter === 'Favorites' && favoritePaths.has(item.path))
+      || (activeFilter === 'Favorites' && favoritePaths.has(screenshotPath(item)))
       || item.cat === activeFilter;
     const matchSearch = !search || item.label.toLowerCase().includes(search) || item.cat.toLowerCase().includes(search);
     return matchCat && matchSearch;
@@ -6215,7 +6274,7 @@ function renderFavoriteShowcase() {{
   const count = document.getElementById('favorite-showcase-count');
   if (!section || !grid || !appInteractive) return;
   const favorites = GALLERY
-    .filter(item => favoritePaths.has(item.path))
+    .filter(item => favoritePaths.has(screenshotPath(item)))
     .sort((a, b) => (b.sort || '').localeCompare(a.sort || ''));
   section.style.display = favorites.length ? '' : 'none';
   count.textContent = favorites.length + ' saved';

@@ -328,6 +328,12 @@ class DashboardHTTPServer(ThreadingHTTPServer):
             roots[candidate.name.lower()] = candidate
         self.root = resolved_root
         self.merge_roots = roots
+        # Favourite keys name their own folder, including the primary one, so
+        # they resolve against a slightly wider map than static URLs do. The
+        # primary folder is not routable as a URL prefix — the browser already
+        # serves it from the root — but it is a legitimate key prefix.
+        self.favorite_roots = dict(roots)
+        self.favorite_roots[resolved_root.name.lower()] = resolved_root
 
     def resolve_declared(self, parts):
         """Map already-split path segments onto a real file inside a declared root.
@@ -481,7 +487,11 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         path = Path(self.server.engine.FAVORITES_FILE)
         path.parent.mkdir(parents=True, exist_ok=True)
         payload = {
-            "version": 1,
+            # Version 2 keys every favourite by its own folder, so the record
+            # survives the account being recomposed. The engine upgrades a
+            # version 1 file on read; this is where the upgrade lands on disk,
+            # the first time the user toggles anything.
+            "version": self.server.engine.FAVORITES_SCHEMA_VERSION,
             "player": self.server.engine.PLAYER_NAME,
             "updated_at": datetime.now().isoformat(timespec="seconds"),
             "favorites": sorted(favorites),
@@ -620,23 +630,28 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         if pure.is_absolute() or pure.suffix.lower() != ".png":
             return None
 
-        parts = list(pure.parts)
-        # A favorite is stored exactly as the dashboard references the image,
-        # so a merged screenshot arrives as `../OldName/...`. Exactly one
-        # leading `..` is allowed, and only when the folder it names is one
-        # this account declared — every other `..` is still refused outright.
-        if parts and parts[0] == "..":
-            if len(parts) < 3 or parts[1].lower() not in self.server.merge_roots:
-                return None
-            parts = parts[1:]
-        if ".." in parts:
+        # A favourite key names its own folder first: `Ralten/Boss Kills/x.png`.
+        # That is what makes it survive the account being recomposed, and it
+        # means the folder must be one this account actually declared rather
+        # than any name the page cares to send.
+        parts = _safe_segments(pure.parts)
+        if not parts or len(parts) < 2:
+            return None
+        folder = self.server.favorite_roots.get(parts[0].lower())
+        if folder is None:
             return None
 
-        if self.server.resolve_declared(parts) is None:
+        try:
+            target = (folder / Path(*parts[1:])).resolve()
+            target.relative_to(folder)
+        except (ValueError, OSError):
             return None
-        # Return the path as given, not as resolved: favorites are keyed by the
-        # same string the HTML uses, so the heart lights up on the next rebuild.
-        return pure.as_posix()
+        if not target.is_file():
+            return None
+
+        # Canonicalise the folder segment to the real directory name so two
+        # spellings of the same screenshot cannot become two favourites.
+        return "/".join([folder.name] + list(parts[1:]))
 
     def do_GET(self):
         parsed = urlparse(self.path)
