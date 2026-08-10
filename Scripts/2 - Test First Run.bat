@@ -81,7 +81,7 @@ set "USERPROFILE=%TESTHOME%"
 set "LOCALAPPDATA=%TESTHOME%\AppData\Local"
 set "HOME=%TESTHOME%"
 
-python "%~dp0dashboard_app.py" %*
+python "%~dp0..\_engine\dashboard_app.py" %*
 
 echo(
 echo   Test finished. The fake home is still at:

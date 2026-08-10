@@ -1398,7 +1398,7 @@ def _run_server(server, url, open_browser):
 if __name__ == "__main__":
     import osrs_dashboard
 
-    # This is the entry point `Refresh Dashboard.bat` uses when running
+    # This is the entry point `Scripts/1 - Refresh Dashboard.bat` uses when running
     # from source, so install the tee here too. Otherwise the log only ever
     # exists for people running the packaged app, which is the opposite of
     # useful during development.

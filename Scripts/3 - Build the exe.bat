@@ -1,11 +1,22 @@
 @echo off
 REM ============================================================
-REM   Build the OSRS Dashboard clan .exe  (run this on Windows)
-REM   Output lands in the "Output" folder next to this file.
+REM   Build the OSRS Dashboard .exe  (run this on Windows)
 REM   Step 1 refreshes drop tables from the wiki; Step 2 compiles.
+REM   The finished exe lands in:
+REM     OSRS Dashboard Resources\Build\Output\
 REM ============================================================
 setlocal
-cd /d "%~dp0..\..\_engine"
+
+REM Every path this script needs, resolved once from its own location.
+REM They are named rather than repeated inline because the script has moved
+REM folders before, and a half-updated relative path fails by writing the exe
+REM somewhere unexpected while still reporting success.
+set "PROJECT=%~dp0.."
+set "ENGINE=%PROJECT%\_engine"
+set "RESOURCES=%PROJECT%\OSRS Dashboard Resources"
+set "BUILDDIR=%RESOURCES%\Build"
+
+cd /d "%ENGINE%"
 
 echo(
 echo Step 1 of 2: refreshing drop tables from the OSRS Wiki...
@@ -44,7 +55,7 @@ if errorlevel 1 (
 :: Before touching this line, read DESIGN.md and GitHub issue #2.
 python -m PyInstaller --onefile --windowed ^
   --name "OSRS Dashboard" ^
-  --icon "%~dp0..\..\_engine\icon.ico" ^
+  --icon "%ENGINE%\icon.ico" ^
   --hidden-import version ^
   --hidden-import console ^
   --hidden-import settings ^
@@ -54,22 +65,24 @@ python -m PyInstaller --onefile --windowed ^
   --hidden-import economic_value ^
   --hidden-import value_recipes ^
   --hidden-import wiki_discovery ^
-  --add-data "%~dp0..\chart.umd.min.js;." ^
-  --add-data "%~dp0..\Cinzel-Latin.woff2;." ^
-  --add-data "%~dp0..\CrimsonText-Regular-Latin.woff2;." ^
-  --add-data "%~dp0..\CrimsonText-Semibold-Latin.woff2;." ^
-  --add-data "%~dp0..\CrimsonText-Italic-Latin.woff2;." ^
-  --distpath "%~dp0Output" ^
-  --workpath "%~dp0_build" ^
-  --specpath "%~dp0_build" ^
+  --add-data "%RESOURCES%\chart.umd.min.js;." ^
+  --add-data "%RESOURCES%\Cinzel-Latin.woff2;." ^
+  --add-data "%RESOURCES%\CrimsonText-Regular-Latin.woff2;." ^
+  --add-data "%RESOURCES%\CrimsonText-Semibold-Latin.woff2;." ^
+  --add-data "%RESOURCES%\CrimsonText-Italic-Latin.woff2;." ^
+  --distpath "%BUILDDIR%\Output" ^
+  --workpath "%BUILDDIR%\_build" ^
+  --specpath "%BUILDDIR%\_build" ^
   dashboard_app.py
 if errorlevel 1 goto :build_failed
 
 echo(
-if exist "%~dp0Output\OSRS Dashboard.exe" (
+if exist "%BUILDDIR%\Output\OSRS Dashboard.exe" (
   echo ============================================================
-  echo   DONE. The exe is in the "Output" folder, with fresh
-  echo   drop tables and offline chart support baked in.
+  echo   DONE. Fresh drop tables and offline chart support baked in.
+  echo   The exe is at:
+  echo     OSRS Dashboard Resources\Build\Output\OSRS Dashboard.exe
+  echo   Check its timestamp is from just now before releasing it.
   echo(
   echo   TO RELEASE IT:
   echo     1. Commit and push your code changes in GitHub Desktop.
