@@ -178,6 +178,9 @@ SETUP_PAGE = """<!DOCTYPE html>
   .hint { color:var(--dim); font-size:.8rem; margin:16px 0 0; line-height:1.55; }
   .step { margin-top:22px; }
   .step h2 { font-size:.95rem; color:var(--gold-bright); font-weight:600; margin:0 0 4px; }
+  /* Step 1 needs a question of its own. Without it the two folder lists read as
+     one control with two overflow links, because only the second was headed. */
+  .step-head { font-size:.95rem; color:var(--gold-bright); font-weight:600; margin:0 0 8px; }
   .step p { margin:0 0 10px; color:var(--dim); font-size:.82rem; line-height:1.55; }
   button.pick.chosen { background:#1c160a; border-color:var(--bright); color:var(--gold-bright); }
   label.opt { display:flex; align-items:center; gap:10px; padding:10px 14px; cursor:pointer;
@@ -217,6 +220,7 @@ SETUP_PAGE = """<!DOCTYPE html>
 <body><div class="wrap">
   <h1>Choose your character</h1>
   <p class="sub" id="sub">Loading...</p>
+  <h2 class="step-head" id="pickHead" style="display:none">Which character do you play now?</h2>
   <div class="card" id="list" style="display:none"></div>
   <details class="disclose" id="pickModeWrap" style="display:none">
     <summary id="pickModeSummary">Show other game modes</summary>
@@ -407,6 +411,7 @@ async function load() {
     document.getElementById('pickModeWrap').style.display = modeCount ? '' : 'none';
     document.getElementById('pickModeSummary').textContent =
       'Show other game modes (' + modeCount + ')';
+    document.getElementById('pickHead').style.display = '';
     list.style.display = '';
     document.getElementById('hint').textContent =
       'Wrong one? You can change it later under Settings in the dashboard.';
