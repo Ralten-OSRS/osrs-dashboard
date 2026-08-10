@@ -12,7 +12,7 @@ from datetime import datetime
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path, PurePosixPath
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 from urllib.request import Request, urlopen
 
 import console
@@ -263,7 +263,10 @@ class DashboardHTTPServer(ThreadingHTTPServer):
         super().__init__(address, handler)
         self.engine = engine
         self.root = Path(root).resolve()
+        self.merge_roots = {}
+        self.set_roots(root, getattr(engine, "MERGE_FOLDERS", ()))
         self.refresh_lock = threading.Lock()
+        # Set below in set_roots; declared here so the attribute always exists.
         self.favorites_lock = threading.Lock()
         self.client_lock = threading.Lock()
         self.clients = set()
@@ -301,6 +304,71 @@ class DashboardHTTPServer(ThreadingHTTPServer):
         with self.build_lock:
             return dict(self.build_state)
 
+    def set_roots(self, root, merge_folders=()):
+        """Declare the folders this account is allowed to serve files from.
+
+        The primary folder plus whatever the user declared to be the same
+        account under a former name — nothing else, and never a folder simply
+        because it sits beside them. Rebuilt as a whole and swapped in, so a
+        request being served while an account switch happens sees either the
+        old set or the new one and never a half-built map.
+        """
+        resolved_root = Path(root).resolve()
+        roots = {}
+        for folder in merge_folders or []:
+            try:
+                candidate = Path(folder).resolve()
+            except OSError:
+                continue
+            if candidate == resolved_root or not candidate.is_dir():
+                continue
+            # Keyed by folder name because that is what survives the browser's
+            # URL normalisation. Lowercased for lookup only: Windows paths are
+            # case-insensitive, and the stored value is the real resolved path.
+            roots[candidate.name.lower()] = candidate
+        self.root = resolved_root
+        self.merge_roots = roots
+
+    def resolve_declared(self, parts):
+        """Map already-split path segments onto a real file inside a declared root.
+
+        Returns the resolved path, or None if it does not land inside the
+        primary folder or one of the declared merge folders. The final
+        containment check is done against resolved paths rather than against
+        the request text, so a link or junction cannot be used to step outside
+        a folder that was legitimately declared.
+        """
+        safe = _safe_segments(parts)
+        if not safe:
+            return None
+
+        candidates = []
+        merge_root = self.merge_roots.get(safe[0].lower())
+        if merge_root is not None and len(safe) > 1:
+            candidates.append((merge_root, safe[1:]))
+        candidates.append((self.root, safe))
+
+        for base, segments in candidates:
+            try:
+                target = (base / Path(*segments)).resolve()
+                target.relative_to(base)
+            except (ValueError, OSError):
+                continue
+            if target.is_file():
+                return target
+        return None
+
+    def resolve_merged_url(self, url_path):
+        """A static GET for a merged folder, or None to fall through to normal serving."""
+        if not self.merge_roots:
+            return None
+        raw = unquote(urlparse(url_path).path)
+        parts = [p for p in raw.split("/") if p]
+        if not parts or parts[0].lower() not in self.merge_roots:
+            return None
+        target = self.resolve_declared(parts)
+        return str(target) if target is not None else None
+
     def register_client(self, client_id):
         with self.client_lock:
             first_ever = not self.had_client
@@ -336,6 +404,21 @@ class DashboardHTTPServer(ThreadingHTTPServer):
             self.shutdown()
 
 
+def _safe_segments(parts):
+    """Path segments with nothing that could climb out of a folder.
+
+    Anything empty, `.`, `..`, or carrying a separator is rejected outright
+    rather than cleaned up. A request is data, and the only segments worth
+    accepting are ones that are already plain names.
+    """
+    safe = []
+    for part in parts:
+        if not part or part in (".", "..") or "/" in part or "\\" in part:
+            return None
+        safe.append(part)
+    return safe
+
+
 class DashboardRequestHandler(SimpleHTTPRequestHandler):
     server_version = "OSRSDashboard/1.0"
 
@@ -349,8 +432,20 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         Reading it from the server instead means the root can change once, when
         a first-run user picks their character, without restarting the service
         or moving them to a different port.
+
+        Merged screenshots are the second case. Their `src` in the HTML is a
+        real `../OldName/...` path so the file still opens with no service
+        running, but a browser resolves a relative reference before it sends
+        the request and discards leading `..` segments that climb past the
+        root (RFC 3986 remove_dot_segments). So what actually arrives here is
+        `/OldName/...`, and the folder it names has to be routed explicitly.
+        Only folders this account declared are routable — the name is matched
+        against that list, never trusted as a path.
         """
         self.directory = str(self.server.root)
+        merged = self.server.resolve_merged_url(path)
+        if merged is not None:
+            return merged
         return super().translate_path(path)
 
     def _send_json(self, status, payload):
@@ -522,15 +617,25 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         if not isinstance(value, str) or not value.strip():
             return None
         pure = PurePosixPath(value.replace("\\", "/"))
-        if pure.is_absolute() or ".." in pure.parts or pure.suffix.lower() != ".png":
+        if pure.is_absolute() or pure.suffix.lower() != ".png":
             return None
-        candidate = (self.server.root / Path(*pure.parts)).resolve()
-        try:
-            candidate.relative_to(self.server.root)
-        except ValueError:
+
+        parts = list(pure.parts)
+        # A favorite is stored exactly as the dashboard references the image,
+        # so a merged screenshot arrives as `../OldName/...`. Exactly one
+        # leading `..` is allowed, and only when the folder it names is one
+        # this account declared — every other `..` is still refused outright.
+        if parts and parts[0] == "..":
+            if len(parts) < 3 or parts[1].lower() not in self.server.merge_roots:
+                return None
+            parts = parts[1:]
+        if ".." in parts:
             return None
-        if not candidate.is_file():
+
+        if self.server.resolve_declared(parts) is None:
             return None
+        # Return the path as given, not as resolved: favorites are keyed by the
+        # same string the HTML uses, so the heart lights up on the next rebuild.
         return pure.as_posix()
 
     def do_GET(self):
@@ -818,7 +923,10 @@ def serve_dashboard(engine, open_browser=True, build_first=True,
 
         def account_chosen(path):
             on_account_chosen(path)
-            server.root = Path(engine.SCREENSHOTS_PATH).resolve()
+            # Re-declare both the root and the merge folders together. Setting
+            # the root alone would leave the previous account's folders
+            # routable, which is the leak the engine-side reset also guards.
+            server.set_roots(engine.SCREENSHOTS_PATH, getattr(engine, "MERGE_FOLDERS", ()))
             server.set_build_building()
             chosen.set()
 
