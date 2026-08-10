@@ -14,7 +14,7 @@ _Archive/
 # channel, so nothing in here is worth versioning: the exe is attached to a
 # release and the README that used to ship beside it had no reader once people
 # started downloading a single file rather than a folder.
-OSRS Dashboard Resources/Build/Output/
+Build Output/
 OSRS Dashboard Resources/Build/_build/
 # Every package that has ever shipped, plus superseded build scripts. Pinned
 # releases live here and are exempt from archive pruning.

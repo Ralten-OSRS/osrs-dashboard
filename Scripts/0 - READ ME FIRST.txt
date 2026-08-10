@@ -30,7 +30,7 @@ else in the project. Numbered by how often you reach for them.
   It refreshes the drop tables from the wiki first, then compiles.
 
   The finished file lands in:
-    OSRS Dashboard Resources\Build\Output\OSRS Dashboard.exe
+    Build Output\OSRS Dashboard.exe
 
   Always check that exe's timestamp is from just now before releasing it.
   A build can report success while writing somewhere unexpected, and a

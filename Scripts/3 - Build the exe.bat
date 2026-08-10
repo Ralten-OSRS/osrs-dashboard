@@ -2,10 +2,8 @@
 REM ============================================================
 REM   Build the OSRS Dashboard .exe  (run this on Windows)
 REM   Step 1 refreshes drop tables from the wiki; Step 2 compiles.
-REM   The finished exe lands in:
-REM     OSRS Dashboard Resources\Build\Output\
-REM   Everything printed here is also written to:
-REM     OSRS Dashboard Resources\Build\build-log.txt
+REM   The finished exe lands in the project's "Build Output" folder,
+REM   next to Scripts. The log lands beside it as build-log.txt.
 REM ============================================================
 setlocal
 
@@ -13,10 +11,11 @@ set "PROJECT=%~dp0.."
 set "ENGINE=%PROJECT%\_engine"
 set "RESOURCES=%PROJECT%\OSRS Dashboard Resources"
 set "BUILDDIR=%RESOURCES%\Build"
-set "BUILDLOG=%BUILDDIR%\build-log.txt"
+set "OUTDIR=%PROJECT%\Build Output"
+set "BUILDLOG=%OUTDIR%\build-log.txt"
 
 if not exist "%BUILDDIR%\_build" mkdir "%BUILDDIR%\_build" >nul 2>&1
-if not exist "%BUILDDIR%\Output" mkdir "%BUILDDIR%\Output" >nul 2>&1
+if not exist "%OUTDIR%" mkdir "%OUTDIR%" >nul 2>&1
 
 echo Build started %DATE% %TIME%> "%BUILDLOG%"
 echo.>> "%BUILDLOG%"
@@ -124,21 +123,21 @@ python -m PyInstaller --onefile --windowed ^
   --add-data "%RESOURCES%\CrimsonText-Regular-Latin.woff2;." ^
   --add-data "%RESOURCES%\CrimsonText-Semibold-Latin.woff2;." ^
   --add-data "%RESOURCES%\CrimsonText-Italic-Latin.woff2;." ^
-  --distpath "%BUILDDIR%\Output" ^
+  --distpath "%OUTDIR%" ^
   --workpath "%BUILDDIR%\_build" ^
   --specpath "%BUILDDIR%\_build" ^
   dashboard_app.py >> "%BUILDLOG%" 2>&1
 if errorlevel 1 goto :build_failed
 
 echo(
-if exist "%BUILDDIR%\Output\OSRS Dashboard.exe" (
+if exist "%OUTDIR%\OSRS Dashboard.exe" (
   echo ============================================================
   echo   DONE. Fresh drop tables and offline chart support baked in.
   echo(
   echo   The exe is at:
-  echo     OSRS Dashboard Resources\Build\Output\OSRS Dashboard.exe
+  echo     Build Output\OSRS Dashboard.exe
   echo(
-  dir /tc "%BUILDDIR%\Output\OSRS Dashboard.exe" | findstr /i "OSRS"
+  dir /tc "%OUTDIR%\OSRS Dashboard.exe" | findstr /i "OSRS"
   echo(
   echo   Check that timestamp is from just now. A build can report
   echo   success while writing somewhere unexpected, and a stale exe
@@ -188,7 +187,7 @@ echo     %BUILDLOG%
 echo(
 echo   Last 25 lines:
 echo ------------------------------------------------------------
-powershell -NoProfile -Command "if (Test-Path '%BUILDLOG%') { Get-Content -LiteralPath '%BUILDLOG%' -Tail 25 }" 2>nul
+powershell -NoProfile -Command "if (Test-Path -LiteralPath $env:BUILDLOG) { Get-Content -LiteralPath $env:BUILDLOG -Tail 25 }" 2>nul
 echo ------------------------------------------------------------
 echo   Attach build-log.txt if you need someone to look at it.
 echo ============================================================
