@@ -59,12 +59,12 @@ The manual refresh, under **Settings**, covers the narrower case where a boss yo
 If you'd rather run the Python directly:
 
 1. Install Python 3.8 or newer, checking "Add Python to PATH" during setup.
-2. Double-click `1 - Refresh Dashboard.bat`. It runs the same launcher the packaged app does, so it behaves the same way — it asks which character on the first run and remembers it.
+2. Double-click `Refresh Dashboard.bat`. It runs the same launcher the packaged app does, so it behaves the same way — it asks which character on the first run and remembers it.
 3. Optionally, copy `config.example.py` to `config.py` for personal tweaks such as attesting drops you own but never screenshotted. Source runs read it; the packaged app deliberately ignores it, so nobody inherits someone else's settings.
 
 The launcher takes `--pick` to choose a different character and `--refresh-boss-data` to re-read the wiki before building.
 
-`_engine/` holds two maintainer scripts you will not normally need — a wiki refresh of the bundled drop tables, and a diagnostic for items that drop from several bosses. See `READ ME - maintainer tools.txt` there for when each is worth running.
+`_engine/` holds three maintainer scripts you will not normally need — a wiki refresh of the bundled drop tables, a diagnostic for items that drop from several bosses, and a harness that runs the app against a throwaway machine so the first-run screens can be tested. See `READ ME - maintainer tools.txt` there for when each is worth running.
 
 All Python lives in `_engine/`. The fonts and Chart.js in `OSRS Dashboard Resources/` are embedded into the generated page so it renders with no network connection.
 

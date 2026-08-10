@@ -12,3 +12,12 @@ Audit Shared Drops.bat
   Lists items that appear on several bosses' drop tables. Items on four or
   more are classified as shared automatically, so this is a diagnostic for
   the rare judgement call, not a release step.
+
+Test First Run.bat
+  Stands up a throwaway machine and launches the app against it, so the
+  first-run experience can actually be seen: the character picker, the
+  question about former names, and the warning about mixing game modes.
+  None of that is reachable on a machine that already has a remembered
+  account, which is every maintainer machine. Run it before any release
+  that touches setup. It redirects USERPROFILE and LOCALAPPDATA for its
+  own window only and never reads or writes your real account data.
