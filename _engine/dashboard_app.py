@@ -106,12 +106,17 @@ def find_characters():
     return base, chars
 
 
-def bind_engine(eng, path, refresh_boss_data=False):
+def bind_engine(eng, path, refresh_boss_data=False, merge_folders=None):
     """Point the engine at one account's folder and neutralise personalisation."""
     name = path.name
     eng.FORCE_BOSS_DATA_REFRESH = refresh_boss_data
     eng.PLAYER_NAME = name
     eng.SCREENSHOTS_PATH = str(path)
+    # Assigned on every bind, including the empty case. Switching accounts
+    # mid-process must not leave the previous account's merged folders pointed
+    # at this one — that would pool a stranger's screenshots into these totals,
+    # which is the same class of leak as personalisation carrying across.
+    eng.MERGE_FOLDERS = [str(folder) for folder in (merge_folders or [])]
     eng.OUTPUT_FILE = str(path / "osrs_dashboard.html")
     eng.XP_HISTORY_FILE = str(path / "xp_history.json")
     eng.FAVORITES_FILE = str(path / "favorites.json")
@@ -149,7 +154,7 @@ def resolve_character(force_pick=False):
     asking every time is an amnesia problem rather than a UI one. We ask on the
     first run, when the remembered folder has gone away, and when the user
     explicitly asks to choose again with --pick. Otherwise we go straight to
-    building. Returns (name, Path) or (None, None).
+    building. Returns (name, Path, [merged folders]) or (None, None, []).
     """
     base, _chars = find_characters()
 
@@ -160,7 +165,10 @@ def resolve_character(force_pick=False):
             if folders:
                 name = remembered["display_name"] or remembered["primary_folder"]
                 print(f"Building for {name}.")
-                return name, folders[0]
+                # account_folders leads with the primary folder; everything
+                # after it is history the user declared to be this same
+                # account under a former name.
+                return name, folders[0], folders[1:]
             print(f"The folder for {remembered['display_name']} is no longer there.")
             print("Let us pick again.\n")
             settings.forget_last()
@@ -173,12 +181,12 @@ def resolve_character(force_pick=False):
         name, path = with_shots[0]
         print(f"Found one character: {name}")
         settings.remember_account(path.name, display_name=name)
-        return name, path
+        return name, path, []
 
     # Anything else gets asked in the browser, so this works identically with
     # or without a console. Returning None here is not a failure; it tells the
     # caller to start the service in setup mode.
-    return None, None
+    return None, None, []
 
 
 def choose_character():
@@ -235,7 +243,7 @@ def run():
     force_pick = "--pick" in sys.argv
     refresh_boss_data = "--refresh-boss-data" in sys.argv
 
-    name, path = resolve_character(force_pick=force_pick)
+    name, path, merge_folders = resolve_character(force_pick=force_pick)
     import osrs_dashboard as eng
 
     setup_base = None
@@ -262,7 +270,7 @@ def run():
         print(f"\nBuilding the dashboard for {name}...")
         print("(First run also starts your XP history; pace tracking fills in as")
         print(" you refresh on future days.)\n")
-        bind_engine(eng, path, refresh_boss_data)
+        bind_engine(eng, path, refresh_boss_data, merge_folders=merge_folders)
 
     from dashboard_server import serve_dashboard
     try:

@@ -38,6 +38,10 @@ PLAYER_NAME = "Player"
 # By default we look at RuneLite's standard screenshots folder. Override
 # below if you keep yours somewhere else.
 SCREENSHOTS_PATH = str(Path.home() / ".runelite" / "screenshots" / PLAYER_NAME)
+# Folders the user declared to be this same account under a former name. They
+# are pooled into the scan above. Empty is the only correct default: merging is
+# always something the user has explicitly asked for, never something detected.
+MERGE_FOLDERS = []
 
 # Road to Max — ACTIVE_SKILLS is a manual override for the ⚡ Active badge.
 # Leave empty (default) and active skills are detected automatically from the
@@ -1311,7 +1315,14 @@ def parse_untradeable_drop(filename):
     return None, 1
 
 
-def scan_screenshots(base_path):
+def scan_screenshots(base_path, merge_folders=None):
+    """Read one account's screenshots, pooling any folders merged into it.
+
+    `merge_folders` holds folders the user declared to be the same account
+    under a former name. They are read as part of this account's history —
+    never a different game mode, and never a different account, both of which
+    keep their own dashboards.
+    """
     data = {
         "categories": defaultdict(list),
         "level_ups": defaultdict(list),
@@ -1332,21 +1343,69 @@ def scan_screenshots(base_path):
 
     all_timestamps = []
 
-    for item in sorted(base.rglob("*.png"), key=lambda p: p.stat().st_mtime, reverse=True):
+    # Roots to read, as (folder, prefix) pairs. The primary folder is where the
+    # dashboard is written, so its screenshots keep the bare relative paths they
+    # have always had — which is what lets existing favorites survive a merge
+    # untouched. Folders merged in under a former name sit beside it, so they
+    # are reached with a `../OldName/` prefix.
+    #
+    # These are real relative paths rather than a virtual scheme on purpose:
+    # the generated HTML has to keep rendering when it is opened straight from
+    # disk with no local service running (DESIGN.md non-negotiable #17), and a
+    # made-up path would only resolve through the service.
+    roots = [(base, "")]
+    for folder in merge_folders or []:
+        folder = Path(folder)
+        if not folder.is_dir() or folder.resolve() == base.resolve():
+            continue
+        roots.append((folder, f"../{folder.name}/"))
+
+    # Collect first, then sort across every root together. Sorting each folder
+    # separately would interleave wrongly and make the newest screenshot in the
+    # merged history depend on which folder it happened to live in.
+    found = []
+    for root, prefix in roots:
+        for item in root.rglob("*.png"):
+            try:
+                mtime = item.stat().st_mtime
+            except OSError:
+                continue
+            found.append((mtime, item, root, prefix))
+    found.sort(key=lambda row: row[0], reverse=True)
+
+    # A user who followed the documented workaround — hand-copying an old
+    # folder's screenshots into the current one — and then also declares that
+    # old folder would otherwise see every shared screenshot twice, inflating
+    # counts, drop totals and wealth. RuneLite filenames carry their own
+    # timestamp, so category plus filename identifies a screenshot well enough
+    # to catch that. The primary folder is scanned first within any tie, so the
+    # copy that keeps its short path wins.
+    merging = len(roots) > 1
+    seen_keys = set()
+    duplicates = 0
+
+    for _mtime, item, root, prefix in found:
         if item.name == "osrs_dashboard.html":
             continue
 
-        rel = item.relative_to(base)
+        rel = item.relative_to(root)
         parts = rel.parts
         category_raw = parts[0] if len(parts) > 1 else "Screenshots"
         category = CATEGORY_LABELS.get(category_raw, category_raw)
+
+        if merging:
+            key = (category_raw.lower(), item.name.lower())
+            if key in seen_keys:
+                duplicates += 1
+                continue
+            seen_keys.add(key)
 
         ts = parse_timestamp(item.name)
         ts_str = ts.strftime("%b %d, %Y · %I:%M %p") if ts else ""
         ts_sort = ts.isoformat() if ts else ""
 
         # Use a relative path so the HTML works from the same folder
-        rel_path = str(rel).replace("\\", "/")
+        rel_path = prefix + str(rel).replace("\\", "/")
 
         entry = {
             "filename": item.name,
@@ -1416,6 +1475,18 @@ def scan_screenshots(base_path):
     if all_timestamps:
         data["first_screenshot"] = min(all_timestamps)
         data["last_screenshot"] = max(all_timestamps)
+
+    # Report the merge rather than performing it silently. A pooled scan
+    # changes almost every number on the dashboard, so a user comparing against
+    # what they saw yesterday needs to be told why — and a duplicate count is
+    # the one figure that says whether their folders overlapped.
+    if merging:
+        merged_names = [prefix.strip("./") for _root, prefix in roots if prefix]
+        data["merged_folders"] = merged_names
+        data["merged_duplicates"] = duplicates
+        print(f"Merged {len(merged_names)} folder(s) from earlier names: {', '.join(merged_names)}")
+        if duplicates:
+            print(f"  Skipped {duplicates} screenshot(s) already present in the current folder.")
 
     return data
 
@@ -6998,7 +7069,7 @@ def generate_dashboard():
         print(f"  - Override SCREENSHOTS_PATH in config.py if your folder lives elsewhere")
         return {"ok": False, "message": "Screenshot folder not found."}
 
-    data = scan_screenshots(SCREENSHOTS_PATH)
+    data = scan_screenshots(SCREENSHOTS_PATH, merge_folders=MERGE_FOLDERS)
 
     if data["total"] == 0:
         print("No screenshots found in that folder.")

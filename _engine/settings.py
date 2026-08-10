@@ -6,12 +6,31 @@ the whole point is to remember which screenshot folder to use — the folder is
 not known until after the setting is read. So it goes in the per-user
 application data directory instead.
 
-The stored shape is an account *record*, not a single remembered name. That is
-deliberate and it is for Issue #1: RuneLite names its screenshot folder after
-the current display name, so changing your name splits one account's history
-across folders. `also_folders` is empty today and unused, but having it in the
-schema from the first release means name-change support is a scan-and-merge
-change rather than a migration applied to every existing user's settings file.
+**One account record is one dashboard.** RuneLite names its screenshot folder
+after the account name *and* the world type, as `<Name>-<Mode>`, so a single
+character can own several folders: a main folder, a folder per league, a beta
+folder. Two different relationships hide in that set and they are not the same
+thing:
+
+* A **rename** produces a folder with a new root name and no link to the old
+  one. Those folders are one account's history split in two, and they merge —
+  that is `also_folders`.
+* A **game mode** produces a folder that is the same character but a separate
+  progression universe. Its XP, drops and wealth must never pool into the main
+  account's numbers, for exactly the reason an ironman's must not. Those get
+  their own record, linked by `character_id` so the interface can offer to
+  switch between them.
+
+Because each record is a dashboard, merging is entirely contained in one
+record's `also_folders` and nothing has to be derived at read time.
+
+**Nothing here is inferred from folder names.** The `-<Mode>` suffix is a real
+convention today, but it belongs to RuneLite and can change in any release —
+this project already lost that bet once when a screenshot subfolder was renamed
+and its contents silently fell out of the dashboard. So the suffix is only ever
+used to pre-tick a checkbox the user confirms during setup; what gets stored
+here is the user's answer, as explicit folder lists. If the convention changes,
+setup offers nothing and the user ticks the boxes themselves.
 
 Nothing here ever ships inside the executable. The engine stays neutral
 (DESIGN.md non-negotiable #10); this file is written on the user's own machine
@@ -23,8 +42,15 @@ import os
 import sys
 from pathlib import Path
 
-SCHEMA_VERSION = 1
+# 2 adds `mode`, `character_id` and `hiscores_name`. Version 1 files are
+# upgraded in memory on read and never rewritten just to bump the number, so
+# downgrading to an older build keeps working: version 1's reader picks the
+# keys it knows and ignores the rest.
+SCHEMA_VERSION = 2
 APP_FOLDER_NAME = "OSRS Dashboard"
+
+# The mode value for an ordinary account folder — the one the hiscores know.
+MAIN_MODE = "main"
 
 
 def settings_dir():
@@ -45,6 +71,76 @@ def _blank():
     return {"version": SCHEMA_VERSION, "accounts": [], "last_used": None}
 
 
+def _clean_folder_list(value, exclude=()):
+    """Strings only, stripped, de-duplicated, order preserved, never the primary.
+
+    A folder listed both as the primary and as a merge target would be scanned
+    twice, which double-counts every screenshot in it. That is a silent wrong
+    number rather than an error, so it is filtered here rather than trusted.
+    """
+    cleaned = []
+    seen = {name for name in exclude}
+    for item in value or []:
+        if not isinstance(item, str):
+            continue
+        name = item.strip()
+        if not name or name in seen:
+            continue
+        seen.add(name)
+        cleaned.append(name)
+    return cleaned
+
+
+def _upgrade(entry):
+    """Normalise one stored record, filling in anything a version 1 file lacks.
+
+    Returns None when the entry cannot be trusted at all, which is only when it
+    has no primary folder — without that there is no dashboard to build.
+    """
+    if not isinstance(entry, dict):
+        return None
+    primary = entry.get("primary_folder")
+    if not isinstance(primary, str) or not primary.strip():
+        return None
+    primary = primary.strip()
+
+    display = entry.get("display_name")
+    display = display.strip() if isinstance(display, str) and display.strip() else primary
+
+    mode = entry.get("mode")
+    mode = mode.strip() if isinstance(mode, str) and mode.strip() else MAIN_MODE
+
+    # A version 1 record predates game-mode awareness, so it is a main account
+    # standing alone. Keying the character on its own primary folder gives it a
+    # stable identity that later mode records can be attached to.
+    character = entry.get("character_id")
+    character = character.strip() if isinstance(character, str) and character.strip() else primary
+
+    # Only a main account has a name the hiscores can answer for. A league or
+    # beta folder is a real character but lives on a separate hiscores endpoint
+    # this app does not call, so the correct value is "don't ask" rather than a
+    # folder name that would return an empty result and read as a dry account.
+    hiscores = entry.get("hiscores_name")
+    if isinstance(hiscores, str) and hiscores.strip():
+        hiscores = hiscores.strip()
+    elif "hiscores_name" in entry and hiscores is None:
+        hiscores = None
+    else:
+        hiscores = primary if mode == MAIN_MODE else None
+
+    prefs = entry.get("preferences")
+
+    return {
+        "display_name": display,
+        "primary_folder": primary,
+        "also_folders": _clean_folder_list(entry.get("also_folders"), exclude=(primary,)),
+        "mode": mode,
+        "character_id": character,
+        "hiscores_name": hiscores,
+        "preferences": prefs if isinstance(prefs, dict) else {},
+    }
+
+
 def load():
     """Read settings, tolerating anything. Never raises.
 
@@ -60,21 +156,26 @@ def load():
         return _blank()
 
     accounts = []
+    claimed = set()
     for entry in data.get("accounts") or []:
-        if not isinstance(entry, dict):
+        upgraded = _upgrade(entry)
+        if upgraded is None:
             continue
-        primary = entry.get("primary_folder")
-        if not isinstance(primary, str) or not primary.strip():
+        # Two records claiming the same primary folder would both write their
+        # dashboard to it. Keep the first and drop the rest.
+        if upgraded["primary_folder"] in claimed:
             continue
-        display = entry.get("display_name")
-        also = [f for f in (entry.get("also_folders") or []) if isinstance(f, str) and f.strip()]
-        prefs = entry.get("preferences")
-        accounts.append({
-            "display_name": display if isinstance(display, str) and display.strip() else primary,
-            "primary_folder": primary,
-            "also_folders": also,
-            "preferences": prefs if isinstance(prefs, dict) else {},
-        })
+        claimed.add(upgraded["primary_folder"])
+        accounts.append(upgraded)
+
+    # A folder merged into one account must not also be another account's
+    # primary, or the same screenshots would count toward two dashboards.
+    # The primary claim wins, because that is where a dashboard already lives.
+    for entry in accounts:
+        entry["also_folders"] = [
+            name for name in entry["also_folders"]
+            if name not in claimed or name == entry["primary_folder"]
+        ]
 
     # A remembered choice is honoured only when it names a real account.
     # Anything else becomes "ask me" — deliberately, and never a guess at a
@@ -124,16 +225,49 @@ def remember_account(folder, display_name=None):
     data = load()
     entry = get_account(data, folder)
     if entry is None:
-        entry = {
+        entry = _upgrade({
             "display_name": display_name or folder,
             "primary_folder": folder,
-            "also_folders": [],
-            "preferences": {},
-        }
+        })
         data["accounts"].append(entry)
     elif display_name:
         entry["display_name"] = display_name
     data["last_used"] = folder
+    save(data)
+    return entry
+
+
+def describe_account(folder, also_folders=None, mode=None, character_id=None,
+                     display_name=None, hiscores_name=None):
+    """Write the grouping the user declared during setup. Returns the record.
+
+    Every field the caller leaves out keeps whatever the record already had, so
+    this can be used to set the merge list without disturbing the mode, or the
+    reverse. Passing `hiscores_name=False` clears it — `None` means "unchanged"
+    here, and a league record genuinely wants a stored null.
+    """
+    data = load()
+    entry = get_account(data, folder)
+    if entry is None:
+        entry = _upgrade({"primary_folder": folder, "display_name": display_name or folder})
+        data["accounts"].append(entry)
+
+    if display_name:
+        entry["display_name"] = display_name
+    if mode:
+        entry["mode"] = mode
+    if character_id:
+        entry["character_id"] = character_id
+    if also_folders is not None:
+        entry["also_folders"] = _clean_folder_list(
+            also_folders,
+            exclude=(entry["primary_folder"],),
+        )
+    if hiscores_name is False:
+        entry["hiscores_name"] = None
+    elif hiscores_name:
+        entry["hiscores_name"] = hiscores_name
+
     save(data)
     return entry
 
@@ -153,13 +287,43 @@ def forget_last():
     save(data)
 
 
-def account_folders(entry, base):
-    """Every screenshot folder belonging to this account, primary first.
+def siblings(data, character_id, exclude_folder=None):
+    """Every other dashboard belonging to the same character, main mode first.
 
-    Only the primary folder is used today. `also_folders` is read here so that
-    Issue #1 has one place to change rather than several.
+    This is what the interface offers as "other modes you have played" — a
+    switch target, never something merged into the current dashboard.
+    """
+    found = [
+        entry for entry in data.get("accounts") or []
+        if entry.get("character_id") == character_id
+        and entry["primary_folder"] != exclude_folder
+    ]
+    found.sort(key=lambda e: (e.get("mode") != MAIN_MODE, e["display_name"].lower()))
+    return found
+
+
+def account_folders(entry, base):
+    """Every screenshot folder this dashboard reads, primary folder first.
+
+    The primary folder is where the dashboard and its data files are written,
+    so it leads and everything else is merged history behind it. Folders that
+    no longer exist are dropped rather than reported: a user who deleted an old
+    screenshot folder should still get a dashboard from what remains.
     """
     base = Path(base)
     folders = [base / entry["primary_folder"]]
     folders.extend(base / name for name in entry.get("also_folders", []))
     return [path for path in folders if path.is_dir()]
+
+
+def declared_roots(entry, base):
+    """Resolved directories this account is permitted to serve files from.
+
+    The local service refuses any path that escapes its root, which is what
+    stops a page asking for arbitrary files. Merging a renamed account means
+    screenshots genuinely do live outside that root, so the guard needs the
+    specific list of folders the user declared rather than a relaxed rule. This
+    is that list, resolved once so the comparison is against real paths and not
+    against strings a request could be crafted to match.
+    """
+    return [path.resolve() for path in account_folders(entry, base)]
