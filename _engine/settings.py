@@ -168,14 +168,16 @@ def load():
         claimed.add(upgraded["primary_folder"])
         accounts.append(upgraded)
 
-    # A folder merged into one account must not also be another account's
-    # primary, or the same screenshots would count toward two dashboards.
-    # The primary claim wins, because that is where a dashboard already lives.
-    for entry in accounts:
-        entry["also_folders"] = [
-            name for name in entry["also_folders"]
-            if name not in claimed or name == entry["primary_folder"]
-        ]
+    # Deliberately no rule here refusing a merge because the folder is also
+    # some other record's primary. An earlier version had one, to stop a
+    # folder counting toward two dashboards, and it broke the exact case this
+    # feature exists for: after a rename the old folder *always* has its own
+    # record, because the user was using it right up until they renamed. The
+    # declaration was silently discarded and the merge never happened. Two
+    # dashboards sharing a folder is not a double count anyway — they are
+    # separate dashboards. Ownership is resolved when the user declares a
+    # former name, by absorbing it (see describe_account), not by filtering
+    # here where the user's intent is no longer visible.
 
     # A remembered choice is honoured only when it names a real account.
     # Anything else becomes "ask me" — deliberately, and never a guess at a
@@ -256,13 +258,39 @@ def describe_account(folder, also_folders=None, mode=None, character_id=None,
         entry["display_name"] = display_name
     if mode:
         entry["mode"] = mode
-    if character_id:
-        entry["character_id"] = character_id
+
+    inherited_character = None
     if also_folders is not None:
         entry["also_folders"] = _clean_folder_list(
             also_folders,
             exclude=(entry["primary_folder"],),
         )
+        # Declaring a folder to be this account under a former name absorbs it.
+        # Before the rename that folder was an account in its own right, so a
+        # record for it exists and would otherwise go on claiming to be a
+        # separate character with its own hiscores name. The surviving record
+        # takes over, and inherits the absorbed identity so the account's
+        # history stays continuous rather than restarting at the new name.
+        #
+        # Nothing on disk is touched: the folder keeps its own screenshots,
+        # favourites and XP history, so un-declaring it restores it as a
+        # standalone account exactly as it was.
+        absorbed = [
+            other for other in data["accounts"]
+            if other is not entry and other["primary_folder"] in entry["also_folders"]
+        ]
+        for other in absorbed:
+            if inherited_character is None:
+                inherited_character = other["character_id"]
+            data["accounts"].remove(other)
+            if data.get("last_used") == other["primary_folder"]:
+                data["last_used"] = entry["primary_folder"]
+
+    if character_id:
+        entry["character_id"] = character_id
+    elif inherited_character:
+        entry["character_id"] = inherited_character
+
     if hiscores_name is False:
         entry["hiscores_name"] = None
     elif hiscores_name:

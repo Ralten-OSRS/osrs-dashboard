@@ -476,15 +476,42 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
         except (UnicodeDecodeError, json.JSONDecodeError):
             return None
 
+    def _all_favorites(self):
+        engine = self.server.engine
+        return engine.load_all_favorites(engine.SCREENSHOTS_PATH, engine.MERGE_FOLDERS)
+
     def _favorites_payload(self):
         return {
-            "version": 1,
+            "version": self.server.engine.FAVORITES_SCHEMA_VERSION,
             "player": self.server.engine.PLAYER_NAME,
-            "favorites": sorted(self.server.engine.load_favorite_paths()),
+            "favorites": sorted(self._all_favorites()),
         }
 
-    def _write_favorites(self, favorites):
-        path = Path(self.server.engine.FAVORITES_FILE)
+    def _toggle_favorite(self, key, favorite):
+        """Add or remove one favourite, in the folder that owns the screenshot.
+
+        A favourite key names its own folder, so the write goes there rather
+        than to whichever folder happens to be primary. That is what makes
+        un-favouriting work at all once folders are merged: writing every
+        change to the primary would leave a removal fighting a union that
+        keeps re-reading the original folder's file and putting it back.
+        """
+        folder = self.server.favorite_roots.get(key.split("/", 1)[0].lower())
+        if folder is None:
+            return None
+        engine = self.server.engine
+        owned = engine.load_favorite_paths(
+            engine.favorites_file_for(folder), primary_folder=folder.name
+        )
+        if favorite:
+            owned.add(key)
+        else:
+            owned.discard(key)
+        self._write_favorites(owned, engine.favorites_file_for(folder))
+        return self._all_favorites()
+
+    def _write_favorites(self, favorites, path=None):
+        path = Path(path or self.server.engine.FAVORITES_FILE)
         path.parent.mkdir(parents=True, exist_ok=True)
         payload = {
             # Version 2 keys every favourite by its own folder, so the record
@@ -804,15 +831,13 @@ class DashboardRequestHandler(SimpleHTTPRequestHandler):
                 self._send_json(400, {"ok": False, "message": "Invalid screenshot favorite."})
                 return
             with self.server.favorites_lock:
-                favorites = self.server.engine.load_favorite_paths()
-                if favorite:
-                    favorites.add(screenshot_path)
-                else:
-                    favorites.discard(screenshot_path)
                 try:
-                    self._write_favorites(favorites)
+                    favorites = self._toggle_favorite(screenshot_path, favorite)
                 except OSError as exc:
                     self._send_json(500, {"ok": False, "message": f"Could not save favorites: {exc}"})
+                    return
+                if favorites is None:
+                    self._send_json(400, {"ok": False, "message": "Invalid screenshot favorite."})
                     return
             self._send_json(200, {"ok": True, "favorite": favorite, "count": len(favorites)})
             return

@@ -199,6 +199,31 @@ def load_favorite_paths(path=None, primary_folder=None):
     return {favorite_key(folder, value) for value in values}
 
 
+def favorites_file_for(folder):
+    """Where a folder's own favourites live: beside its screenshots."""
+    return Path(folder) / "favorites.json"
+
+
+def load_all_favorites(primary_path=None, merge_folders=None):
+    """Every favourite for this account, across all the folders it is made of.
+
+    Each folder stores the favourites for its *own* screenshots, which is what
+    keeps this a plain union with nothing to reconcile. It also means removing
+    a folder from the account leaves its hearts dormant alongside it rather
+    than deleting them, and re-adding the folder brings them back — the
+    reversibility non-negotiable #16 promises.
+    """
+    primary = Path(primary_path or SCREENSHOTS_PATH)
+    favorites = load_favorite_paths(favorites_file_for(primary), primary_folder=primary.name)
+    for folder in merge_folders or []:
+        folder = Path(folder)
+        favorites |= load_favorite_paths(
+            favorites_file_for(folder),
+            primary_folder=folder.name,
+        )
+    return favorites
+
+
 def load_dashboard_asset(name):
     """Read a pinned dashboard asset from source or a PyInstaller bundle."""
     candidates = []
@@ -7186,7 +7211,7 @@ def generate_dashboard():
     hiscores = fetch_hiscores(PLAYER_NAME, debug=False)
     newly_seen_bosses = update_known_bosses(hiscores.get("boss_names", []))
     xp_history = merge_xp_history(update_xp_history(hiscores), MERGE_FOLDERS)
-    favorite_paths = load_favorite_paths()
+    favorite_paths = load_all_favorites(SCREENSHOTS_PATH, MERGE_FOLDERS)
     acquisitions = build_economic_acquisitions(data, VALUE_COMPONENT_OVERRIDES)
     if FORCE_BOSS_DATA_REFRESH:
         _force_bosses = [name for name in hiscores.get("boss_names", []) if name]
