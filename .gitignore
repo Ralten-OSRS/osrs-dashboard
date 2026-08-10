@@ -16,12 +16,15 @@ Distribution/_build/
 # started downloading a single file rather than a folder.
 Distribution/Clan Package/
 
-# Workspace operating files. These describe how the project is worked on
-# rather than how the dashboard works, and they stay on the local machine.
-AGENTS.md
-CLAUDE.md
-MEMORY.md
-DESIGN.md
+# Workspace operating files describe how the project is worked on rather than
+# how the dashboard works, and they stay on the local machine. Naming them one
+# by one meant every new workspace file type published itself by default until
+# someone remembered to add a line here, and the failure mode is a personal
+# file going public. So markdown is excluded wholesale and publishing is
+# opt-in: add a `!` line below for any doc genuinely meant for readers of the
+# repository (CONTRIBUTING.md, docs/, a changelog).
+*.md
+!README.md
 
 # Resources now holds runtime assets only — the pinned Chart.js and the fonts
 # embedded into every generated dashboard. Design records moved to
