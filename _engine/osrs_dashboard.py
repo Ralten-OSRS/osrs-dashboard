@@ -243,6 +243,52 @@ def load_dashboard_font_css():
     return "".join(rules)
 
 
+def _read_xp_history_file(path):
+    """One xp_history.json as a list, or an empty list. Never raises."""
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            history = json.load(f)
+    except (OSError, ValueError):
+        return []
+    return history if isinstance(history, list) else []
+
+
+def merge_xp_history(primary_history, merge_folders=None):
+    """Union in snapshots recorded under this account's earlier names.
+
+    Read-only, and deliberately so. The merged snapshots are *not* written
+    into the primary folder's file: absorbing them would make the merge
+    permanent, so removing a folder later would leave its history behind with
+    no way to tell it apart. Recomposing the account has to be reversible, the
+    same way favourites are (DESIGN.md #16), so the union is recomputed each
+    refresh and only the primary folder's own file is ever written.
+
+    A date present in more than one file resolves to the primary folder's
+    copy. That is the file still being appended to, so it is the most recent
+    reading of the account.
+    """
+    if not merge_folders:
+        return primary_history
+
+    by_date = {}
+    for folder in merge_folders:
+        for entry in _read_xp_history_file(Path(folder) / "xp_history.json"):
+            if isinstance(entry, dict) and entry.get("date"):
+                by_date.setdefault(entry["date"], entry)
+    inherited = len(by_date)
+
+    for entry in primary_history or []:
+        if isinstance(entry, dict) and entry.get("date"):
+            by_date[entry["date"]] = entry
+
+    merged = sorted(by_date.values(), key=lambda h: h.get("date", ""))
+    added = len(merged) - len(primary_history or [])
+    if added > 0:
+        print(f"Inherited {added} XP snapshot(s) from earlier names "
+              f"({inherited} read, {inherited - added} already present).")
+    return merged
+
+
 def update_xp_history(hiscores):
     """Log today's per-skill XP snapshot and return the full history (oldest first).
 
@@ -7139,7 +7185,7 @@ def generate_dashboard():
 
     hiscores = fetch_hiscores(PLAYER_NAME, debug=False)
     newly_seen_bosses = update_known_bosses(hiscores.get("boss_names", []))
-    xp_history = update_xp_history(hiscores)
+    xp_history = merge_xp_history(update_xp_history(hiscores), MERGE_FOLDERS)
     favorite_paths = load_favorite_paths()
     acquisitions = build_economic_acquisitions(data, VALUE_COMPONENT_OVERRIDES)
     if FORCE_BOSS_DATA_REFRESH:
