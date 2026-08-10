@@ -1,7 +1,7 @@
 @echo off
 title Update OSRS Drop Tables
-cd /d "%~dp0.."
-python "%~dp0update_boss_drops.py"
+cd /d "%~dp0..\_engine"
+python "%~dp0..\_engine\update_boss_drops.py"
 echo.
 if %errorlevel% neq 0 (
     echo ── Update failed. See error above. ──

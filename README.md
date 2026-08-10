@@ -30,9 +30,9 @@ Download the latest `OSRS.Dashboard.exe` from the [Releases](../../releases) pag
 
 Windows may show a blue "Windows protected your PC" warning. Click **More info**, then **Run anyway**. That warning appears because the file isn't signed through the Microsoft Store, not because anything is wrong with it. Nothing gets installed.
 
-Your browser opens straight away. If you have more than one character with screenshots, it asks which one you want and remembers the answer, so you only choose once. Then it reads your screenshots, showing progress as it goes, and your dashboard appears when it's done. The first run on a large account takes a minute or so.
+Your browser opens straight away. If you have more than one character with screenshots, it asks which one you play now, and then whether that character has gone by any other names — RuneLite starts a fresh folder every time you change your name, so ticking the old ones brings your whole history into a single dashboard. Both answers are remembered, so you only do this once. Then it reads your screenshots, showing progress as it goes, and your dashboard appears when it's done. The first run on a large account takes a minute or so.
 
-Every run after that goes straight to building. Use the **Refresh** button inside the page to rescan whenever you like, and **Settings** in the sidebar to switch characters or refresh boss data.
+Every run after that goes straight to building. Use the **Refresh** button inside the page to rescan whenever you like, and **Settings** in the sidebar to change which folders make up your account, switch to a different character, or refresh boss data.
 
 There's no terminal and nothing to install. The app closes itself a few seconds after you close the last dashboard tab.
 
@@ -59,12 +59,12 @@ The manual refresh, under **Settings**, covers the narrower case where a boss yo
 If you'd rather run the Python directly:
 
 1. Install Python 3.8 or newer, checking "Add Python to PATH" during setup.
-2. Double-click `1 - Refresh Dashboard.bat`. It runs the same launcher the packaged app does, so it behaves the same way — it asks which character on the first run and remembers it.
+2. Double-click `Scripts/1 - Refresh Dashboard.bat`. It runs the same launcher the packaged app does, so it behaves the same way — it asks which character on the first run and remembers it.
 3. Optionally, copy `config.example.py` to `config.py` for personal tweaks such as attesting drops you own but never screenshotted. Source runs read it; the packaged app deliberately ignores it, so nobody inherits someone else's settings.
 
 The launcher takes `--pick` to choose a different character and `--refresh-boss-data` to re-read the wiki before building.
 
-`_engine/` holds two maintainer scripts you will not normally need — a wiki refresh of the bundled drop tables, and a diagnostic for items that drop from several bosses. See `READ ME - maintainer tools.txt` there for when each is worth running.
+`Scripts/` holds everything runnable, numbered from daily use downward. Script 1 is the launcher above; the rest build and test releases — compiling the exe, refreshing the bundled drop tables from the wiki, a diagnostic for items dropping from several bosses, and a harness that runs the app against a throwaway machine so the first-run screens can be tested. Its `0 - READ ME FIRST.txt` says when each is worth running, and none of them are needed to just use the dashboard.
 
 All Python lives in `_engine/`. The fonts and Chart.js in `OSRS Dashboard Resources/` are embedded into the generated page so it renders with no network connection.
 

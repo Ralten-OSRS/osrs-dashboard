@@ -1,0 +1,60 @@
+SCRIPTS
+=======
+
+Everything you can run lives in this folder. Nothing to run sits anywhere
+else in the project. Numbered by how often you reach for them.
+
+
+1 - Refresh Dashboard.bat
+  Builds your dashboard and opens it. This is the only one you need for
+  normal use. Everything below is for building and testing releases.
+
+  Takes --pick to choose a different character, and --refresh-boss-data
+  to re-read the wiki before building.
+
+
+2 - Test First Run.bat
+  Runs the app against a throwaway machine so the first-run screens can
+  actually be seen: choosing a character, the question about former
+  names, and the warning about mixing game modes.
+
+  You cannot reach any of that normally, because your machine already has
+  a remembered account. Run this before any release that touches setup.
+
+  It redirects USERPROFILE and LOCALAPPDATA for its own window only. Your
+  real screenshots, favourites and XP history are never read or written.
+
+
+3 - Build the exe.bat
+  Makes the release executable. This is the only way an exe gets built.
+  It refreshes the drop tables from the wiki first, then compiles.
+
+  The finished file lands in:
+    OSRS Dashboard Resources\Build\Output\OSRS Dashboard.exe
+
+  Always check that exe's timestamp is from just now before releasing it.
+  A build can report success while writing somewhere unexpected, and a
+  stale exe looks identical to a fresh one.
+
+
+4 - Update Drop Tables.bat
+  Re-reads every boss drop table, rate, category and Combat Achievement
+  list from the OSRS Wiki into _engine\boss_drops_generated.py.
+
+  Rarely needed by hand: script 3 runs it automatically before every
+  build, and the dashboard looks up bosses it has never seen on its own
+  as you play. Reach for it only to refresh bundled tables without doing
+  a full build.
+
+
+5 - Audit Shared Drops.bat
+  Lists items appearing on several bosses' drop tables. Items on four or
+  more are classified as shared automatically, so this is a diagnostic
+  for the rare judgement call, not a release step.
+
+
+WHERE EVERYTHING ELSE LIVES
+---------------------------
+  _engine\                     all the Python. Nothing to double-click.
+  OSRS Dashboard Resources\    fonts, Chart.js, build output, shipped builds
+  Scripts\                     you are here

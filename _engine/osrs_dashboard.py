@@ -23,7 +23,7 @@ from datetime import datetime, timedelta
 from collections import defaultdict
 from urllib.request import urlopen
 from urllib.parse import quote
-from urllib.error import URLError
+from urllib.error import HTTPError, URLError
 
 from economic_value import resolve_economic_value
 from value_recipes import VALUE_RECIPES
@@ -38,6 +38,10 @@ PLAYER_NAME = "Player"
 # By default we look at RuneLite's standard screenshots folder. Override
 # below if you keep yours somewhere else.
 SCREENSHOTS_PATH = str(Path.home() / ".runelite" / "screenshots" / PLAYER_NAME)
+# Folders the user declared to be this same account under a former name. They
+# are pooled into the scan above. Empty is the only correct default: merging is
+# always something the user has explicitly asked for, never something detected.
+MERGE_FOLDERS = []
 
 # Road to Max — ACTIVE_SKILLS is a manual override for the ⚡ Active badge.
 # Leave empty (default) and active skills are detected automatically from the
@@ -136,8 +140,31 @@ ETA_USEFUL_MAX_DAYS = 365 * 3
 ACTIVE_XP_FLOOR = 100_000
 
 
-def load_favorite_paths(path=None):
-    """Return normalized screenshot-relative paths from favorites.json."""
+FAVORITES_SCHEMA_VERSION = 2
+
+
+def favorite_key(folder_name, relative_path):
+    """The stable identity of a screenshot: its folder plus its path inside it.
+
+    Deliberately not the path relative to whichever folder is currently
+    primary. That one changes when the user recomposes the account — the same
+    image is `Boss Kills/x.png` in one composition and `../OldName/Boss
+    Kills/x.png` in another — so keying on it would drop the user's hearts
+    every time they changed their mind (DESIGN.md non-negotiable #16).
+    """
+    return f"{folder_name}/{str(relative_path).replace(chr(92), '/').lstrip('/')}"
+
+
+def load_favorite_paths(path=None, primary_folder=None):
+    """Return stable favorite keys from favorites.json, migrating version 1.
+
+    Version 1 stored paths relative to the account folder, back when an
+    account was always exactly one folder. Every such entry therefore belongs
+    to the primary folder, which makes the upgrade unambiguous. It is applied
+    on read and not written back: a plain refresh has never modified this file
+    and must not start, so the file becomes version 2 the next time the user
+    actually toggles a favorite.
+    """
     favorites_path = Path(path or FAVORITES_FILE)
     try:
         with favorites_path.open("r", encoding="utf-8") as f:
@@ -145,12 +172,56 @@ def load_favorite_paths(path=None):
     except (OSError, json.JSONDecodeError):
         return set()
 
-    raw = payload.get("favorites", []) if isinstance(payload, dict) else []
-    return {
-        str(value).replace("\\", "/")
+    if not isinstance(payload, dict):
+        return set()
+
+    raw = payload.get("favorites", [])
+    values = [
+        str(value).replace("\\", "/").strip()
         for value in raw
         if isinstance(value, str) and value.strip()
-    }
+    ]
+
+    try:
+        version = int(payload.get("version", 1))
+    except (TypeError, ValueError):
+        version = 1
+
+    if version >= FAVORITES_SCHEMA_VERSION:
+        return set(values)
+
+    # Version 1: bare account-relative paths. Without a primary folder name
+    # there is nothing to key them to, so leave them as-is rather than invent
+    # a prefix that would not match anything.
+    folder = primary_folder or Path(SCREENSHOTS_PATH).name
+    if not folder:
+        return set(values)
+    return {favorite_key(folder, value) for value in values}
+
+
+def favorites_file_for(folder):
+    """Where a folder's own favourites live: beside its screenshots."""
+    return Path(folder) / "favorites.json"
+
+
+def load_all_favorites(primary_path=None, merge_folders=None):
+    """Every favourite for this account, across all the folders it is made of.
+
+    Each folder stores the favourites for its *own* screenshots, which is what
+    keeps this a plain union with nothing to reconcile. It also means removing
+    a folder from the account leaves its hearts dormant alongside it rather
+    than deleting them, and re-adding the folder brings them back — the
+    reversibility non-negotiable #16 promises.
+    """
+    primary = Path(primary_path or SCREENSHOTS_PATH)
+    favorites = load_favorite_paths(favorites_file_for(primary), primary_folder=primary.name)
+    for folder in merge_folders or []:
+        folder = Path(folder)
+        favorites |= load_favorite_paths(
+            favorites_file_for(folder),
+            primary_folder=folder.name,
+        )
+    return favorites
 
 
 def load_dashboard_asset(name):
@@ -195,6 +266,82 @@ def load_dashboard_font_css():
             "}"
         )
     return "".join(rules)
+
+
+def _read_xp_history_file(path):
+    """One xp_history.json as a list, or an empty list. Never raises."""
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            history = json.load(f)
+    except (OSError, ValueError):
+        return []
+    return history if isinstance(history, list) else []
+
+
+def warn_if_name_is_stale(hiscores, xp_history, player_name):
+    """Say so when the chosen folder's name no longer exists on the hiscores.
+
+    This is the failure the rename feature itself can cause: pick an older
+    folder as the current one and every refresh quietly stops collecting XP,
+    because the hiscores only answer for the name the account has now. The
+    dashboard still builds and still looks right, so nothing announces it.
+
+    Existing history is what separates the two cases. A name that has been
+    answering for months and stops has almost certainly been renamed; a name
+    that never answered at all is more likely the wrong folder or a typo.
+    """
+    if (hiscores or {}).get("lookup") != "not_found":
+        return False
+    print()
+    if xp_history:
+        last = xp_history[-1].get("date", "an earlier date")
+        print(f"  '{player_name}' no longer appears on the hiscores, but this account")
+        print(f"  has XP history up to {last}. That usually means the character was")
+        print("  renamed. Your screenshots and history are safe, but no new XP will be")
+        print("  recorded until you build from the folder with your current name and")
+        print(f"  declare '{player_name}' as a former name in Settings.")
+    else:
+        print(f"  '{player_name}' does not appear on the hiscores, so levels, Road to Max")
+        print("  and pace tracking will be empty. Check that this folder is named exactly")
+        print("  as your character is in game.")
+    print()
+    return True
+
+
+def merge_xp_history(primary_history, merge_folders=None):
+    """Union in snapshots recorded under this account's earlier names.
+
+    Read-only, and deliberately so. The merged snapshots are *not* written
+    into the primary folder's file: absorbing them would make the merge
+    permanent, so removing a folder later would leave its history behind with
+    no way to tell it apart. Recomposing the account has to be reversible, the
+    same way favourites are (DESIGN.md #16), so the union is recomputed each
+    refresh and only the primary folder's own file is ever written.
+
+    A date present in more than one file resolves to the primary folder's
+    copy. That is the file still being appended to, so it is the most recent
+    reading of the account.
+    """
+    if not merge_folders:
+        return primary_history
+
+    by_date = {}
+    for folder in merge_folders:
+        for entry in _read_xp_history_file(Path(folder) / "xp_history.json"):
+            if isinstance(entry, dict) and entry.get("date"):
+                by_date.setdefault(entry["date"], entry)
+    inherited = len(by_date)
+
+    for entry in primary_history or []:
+        if isinstance(entry, dict) and entry.get("date"):
+            by_date[entry["date"]] = entry
+
+    merged = sorted(by_date.values(), key=lambda h: h.get("date", ""))
+    added = len(merged) - len(primary_history or [])
+    if added > 0:
+        print(f"Inherited {added} XP snapshot(s) from earlier names "
+              f"({inherited} read, {inherited - added} already present).")
+    return merged
 
 
 def update_xp_history(hiscores):
@@ -524,12 +671,22 @@ def fetch_hiscores(player_name, debug=False):
         result = parse_hiscores_payload(payload)
         print(f"Skills: {len(result['skills'])} | Bosses with KC: {len(result['bosses'])} | Clues: {len(result['clues'])}")
         return result
+    except HTTPError as e:
+        # 404 means the hiscores have no such player, which is a different
+        # problem from being offline and has a different fix. Distinguishing
+        # them is what lets a renamed account be told it has renamed instead
+        # of being told the network is down.
+        if e.code == 404:
+            print(f"The hiscores have no player named '{player_name}'.")
+            return {"skills": {}, "clues": {}, "bosses": {}, "boss_names": [], "lookup": "not_found"}
+        print(f"Could not fetch hiscores: {e}. Using screenshot data instead.")
+        return {"skills": {}, "clues": {}, "bosses": {}, "boss_names": [], "lookup": "unreachable"}
     except URLError as e:
         print(f"Could not fetch hiscores: {e}. Using screenshot data instead.")
-        return {"skills": {}, "clues": {}, "bosses": {}, "boss_names": []}
+        return {"skills": {}, "clues": {}, "bosses": {}, "boss_names": [], "lookup": "unreachable"}
     except Exception as e:
         print(f"Hiscores parse error: {e}. Using screenshot data instead.")
-        return {"skills": {}, "clues": {}, "bosses": {}, "boss_names": []}
+        return {"skills": {}, "clues": {}, "bosses": {}, "boss_names": [], "lookup": "error"}
 
 # NOTE: HISCORES_ACTIVITIES list is intentionally not maintained. We now use the
 # JSON hiscores endpoint, which keys every activity by name, so positional drift
@@ -1311,7 +1468,14 @@ def parse_untradeable_drop(filename):
     return None, 1
 
 
-def scan_screenshots(base_path):
+def scan_screenshots(base_path, merge_folders=None):
+    """Read one account's screenshots, pooling any folders merged into it.
+
+    `merge_folders` holds folders the user declared to be the same account
+    under a former name. They are read as part of this account's history —
+    never a different game mode, and never a different account, both of which
+    keep their own dashboards.
+    """
     data = {
         "categories": defaultdict(list),
         "level_ups": defaultdict(list),
@@ -1332,26 +1496,76 @@ def scan_screenshots(base_path):
 
     all_timestamps = []
 
-    for item in sorted(base.rglob("*.png"), key=lambda p: p.stat().st_mtime, reverse=True):
+    # Roots to read, as (folder, prefix) pairs. The primary folder is where the
+    # dashboard is written, so its screenshots keep the bare relative paths they
+    # have always had — which is what lets existing favorites survive a merge
+    # untouched. Folders merged in under a former name sit beside it, so they
+    # are reached with a `../OldName/` prefix.
+    #
+    # These are real relative paths rather than a virtual scheme on purpose:
+    # the generated HTML has to keep rendering when it is opened straight from
+    # disk with no local service running (DESIGN.md non-negotiable #17), and a
+    # made-up path would only resolve through the service.
+    roots = [(base, "")]
+    for folder in merge_folders or []:
+        folder = Path(folder)
+        if not folder.is_dir() or folder.resolve() == base.resolve():
+            continue
+        roots.append((folder, f"../{folder.name}/"))
+
+    # Collect first, then sort across every root together. Sorting each folder
+    # separately would interleave wrongly and make the newest screenshot in the
+    # merged history depend on which folder it happened to live in.
+    found = []
+    for root, prefix in roots:
+        for item in root.rglob("*.png"):
+            try:
+                mtime = item.stat().st_mtime
+            except OSError:
+                continue
+            found.append((mtime, item, root, prefix))
+    found.sort(key=lambda row: row[0], reverse=True)
+
+    # A user who followed the documented workaround — hand-copying an old
+    # folder's screenshots into the current one — and then also declares that
+    # old folder would otherwise see every shared screenshot twice, inflating
+    # counts, drop totals and wealth. RuneLite filenames carry their own
+    # timestamp, so category plus filename identifies a screenshot well enough
+    # to catch that. The primary folder is scanned first within any tie, so the
+    # copy that keeps its short path wins.
+    merging = len(roots) > 1
+    seen_keys = set()
+    duplicates = 0
+
+    for _mtime, item, root, prefix in found:
         if item.name == "osrs_dashboard.html":
             continue
 
-        rel = item.relative_to(base)
+        rel = item.relative_to(root)
         parts = rel.parts
         category_raw = parts[0] if len(parts) > 1 else "Screenshots"
         category = CATEGORY_LABELS.get(category_raw, category_raw)
+
+        if merging:
+            key = (category_raw.lower(), item.name.lower())
+            if key in seen_keys:
+                duplicates += 1
+                continue
+            seen_keys.add(key)
 
         ts = parse_timestamp(item.name)
         ts_str = ts.strftime("%b %d, %Y · %I:%M %p") if ts else ""
         ts_sort = ts.isoformat() if ts else ""
 
         # Use a relative path so the HTML works from the same folder
-        rel_path = str(rel).replace("\\", "/")
+        rel_path = prefix + str(rel).replace("\\", "/")
 
         entry = {
             "filename": item.name,
             "path": str(item),
             "rel_path": rel_path,
+            # Stable across recompositions; `rel_path` is not. See #16.
+            "fav_key": favorite_key(root.name, rel),
             "timestamp": ts,
             "ts_str": ts_str,
             "ts_sort": ts_sort,
@@ -1416,6 +1630,18 @@ def scan_screenshots(base_path):
     if all_timestamps:
         data["first_screenshot"] = min(all_timestamps)
         data["last_screenshot"] = max(all_timestamps)
+
+    # Report the merge rather than performing it silently. A pooled scan
+    # changes almost every number on the dashboard, so a user comparing against
+    # what they saw yesterday needs to be told why — and a duplicate count is
+    # the one figure that says whether their folders overlapped.
+    if merging:
+        merged_names = [prefix.strip("./") for _root, prefix in roots if prefix]
+        data["merged_folders"] = merged_names
+        data["merged_duplicates"] = duplicates
+        print(f"Merged {len(merged_names)} folder(s) from earlier names: {', '.join(merged_names)}")
+        if duplicates:
+            print(f"  Skipped {duplicates} screenshot(s) already present in the current folder.")
 
     return data
 
@@ -1567,8 +1793,10 @@ def build_this_week_memories(gallery_items, chronicle_events, today=None,
             continue
 
         # Explicit user curation outranks inferred importance while preserving
-        # the anniversary-window contract for This Week in Gielinor.
-        if src in favorite_paths:
+        # the anniversary-window contract for This Week in Gielinor. Matched on
+        # the stable key, not the renderable path, so a recomposed account
+        # keeps promoting the same screenshots.
+        if entry.get("fav_key", "") in favorite_paths:
             score += 200
         score += (window_days - distance) * 2
         years_ago = today.year - ts.year
@@ -2154,6 +2382,9 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
     else:
         pet_html = '<p class="empty-note">No pet screenshots found yet.</p>'
     pets_json = json.dumps(pets_json_data)
+    # The folder every un-prefixed relative path belongs to, so the page
+    # can derive a stable favourite key without every item carrying one.
+    primary_folder_json = json.dumps(Path(SCREENSHOTS_PATH).name)
 
     # Clues — compact stat row. Tier colors follow Destiny's engram rarity:
     # Medium=green, Hard=blue, Elite=purple, Master=gold.
@@ -3111,6 +3342,39 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
     --red: #9b2020;
     --green: #3a6b20;
   }}
+
+  /* Checkboxes in the settings composition list. The native control renders
+     as a white box with a blue tick, which is the one piece of default browser
+     chrome loud enough to break the parchment palette. accent-color alone
+     only tints the checked state and leaves the unchecked box white, so the
+     control is rebuilt from scratch. Sizing stays at 15px so the hit target
+     matches what the browser would have drawn. */
+  .comp-check {{
+    appearance: none;
+    -webkit-appearance: none;
+    flex: none;
+    width: 15px;
+    height: 15px;
+    border: 1px solid var(--border-bright);
+    background: var(--bg);
+    cursor: pointer;
+    position: relative;
+    transition: border-color .15s, background .15s;
+  }}
+  .comp-check:hover {{ border-color: var(--gold); }}
+  .comp-check:checked {{ border-color: var(--gold); background: var(--gold-dim); }}
+  .comp-check:checked::after {{
+    content: "";
+    position: absolute;
+    left: 4px;
+    top: 0px;
+    width: 4px;
+    height: 9px;
+    border: solid var(--gold-bright);
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+  }}
+  .comp-check:focus-visible {{ outline: 1px solid var(--gold-bright); outline-offset: 2px; }}
 
   * {{ box-sizing: border-box; margin: 0; padding: 0; }}
   html {{
@@ -4485,6 +4749,24 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
     color: var(--text-muted); font-size: 0.82rem; line-height: 1.6;
     margin: 7px 0 0; white-space: pre-wrap; word-break: break-word;
   }}
+  /* Patch-note groups. The heading carries the weight so the eye can jump
+     between "Added" and "Fixed" without reading the entries under them. */
+  .fb-notes-head {{
+    color: var(--gold); font-size: 0.74rem; letter-spacing: 0.08em;
+    text-transform: uppercase; margin: 12px 0 4px;
+  }}
+  .fb-notes-head:first-child {{ margin-top: 8px; }}
+  .fb-notes-list {{
+    margin: 0; padding: 0; list-style: none;
+    color: var(--text-muted); font-size: 0.82rem; line-height: 1.55;
+  }}
+  .fb-notes-list li {{
+    position: relative; padding: 2px 0 2px 14px; word-break: break-word;
+  }}
+  .fb-notes-list li::before {{
+    content: ""; position: absolute; left: 3px; top: 0.72em;
+    width: 4px; height: 4px; background: var(--gold-dim);
+  }}
 
   @media (max-width: 760px) {{
     .fb-panel {{ margin: 16px auto; padding: 18px; }}
@@ -5592,6 +5874,7 @@ let lbIndex = 0;
 const GALLERY_BATCH_SIZE = 72;
 let galleryVisibleCount = GALLERY_BATCH_SIZE;
 let appInteractive = false;
+const PRIMARY_FOLDER = {primary_folder_json};
 let favoritePaths = new Set();
 let appDiagnostics = {{}};
 let feedbackMode = null;
@@ -5769,11 +6052,14 @@ async function openSettings() {{
   holder.textContent = 'Loading...';
   document.getElementById('fb-modal').classList.add('open');
   let data = null;
+  let composition = null;
   try {{
     const response = await fetch('/api/settings', {{cache: 'no-store'}});
     if (response.ok) data = await response.json();
+    const compResponse = await fetch('/api/composition', {{cache: 'no-store'}});
+    if (compResponse.ok) composition = await compResponse.json();
   }} catch (_error) {{ /* handled below */ }}
-  renderSettings(holder, data);
+  renderSettings(holder, data, composition);
 }}
 
 function settingsRow(holder, label) {{
@@ -5790,7 +6076,7 @@ function settingsRow(holder, label) {{
   return wrap;
 }}
 
-function renderSettings(holder, data) {{
+function renderSettings(holder, data, composition) {{
   holder.textContent = '';
   if (!data || !data.ok) {{
     const note = document.createElement('p');
@@ -5800,14 +6086,31 @@ function renderSettings(holder, data) {{
     return;
   }}
 
-  const account = settingsRow(holder, 'Character');
+  if (composition && composition.ok) {{
+    renderComposition(holder, composition);
+  }}
+
+  const account = settingsRow(holder, 'Build a different character');
   const current = document.createElement('p');
-  current.className = 'fb-release-notes';
-  current.textContent = 'Currently showing ' + data.current + '.';
+  const currentName = composition && composition.ok ? composition.current : data.current;
+  current.className = 'fb-note';
+  current.textContent = 'This is not the same as the question above. Ticking a folder there adds it to ' + currentName +
+    ' as a former name. Choosing a character here leaves ' + currentName +
+    ' behind and builds that one instead, as its own dashboard with its own history and hiscores. Nothing is combined, and nothing is lost — you can come back.';
   account.appendChild(current);
 
-  const others = (data.options || []).filter(name => name !== data.current);
+  const partOf = composition && composition.ok
+    ? [composition.current].concat(composition.also || [])
+    : [data.current];
+  const others = (data.options || []).filter(name => partOf.indexOf(name) === -1);
   if (others.length) {{
+    // Collapsed: on a machine with a dozen folders this was a wall of buttons
+    // directly under the composition list, and the two read as one control.
+    const wrap = document.createElement('details');
+    const openIt = document.createElement('summary');
+    openIt.style.cssText = 'cursor:pointer;font-size:.8rem;opacity:.75;margin:8px 0';
+    openIt.textContent = 'Show other characters (' + others.length + ')';
+    wrap.appendChild(openIt);
     const picker = document.createElement('div');
     picker.className = 'fb-actions';
     picker.style.justifyContent = 'flex-start';
@@ -5815,11 +6118,12 @@ function renderSettings(holder, data) {{
     others.forEach(name => {{
       const button = document.createElement('button');
       button.className = 'feedback-btn';
-      button.textContent = 'Switch to ' + name;
-      button.onclick = () => switchCharacter(name, account, data.current);
+      button.textContent = name;
+      button.onclick = () => switchCharacter(name, account, currentName);
       picker.appendChild(button);
     }});
-    account.appendChild(picker);
+    wrap.appendChild(picker);
+    account.appendChild(wrap);
   }} else {{
     const only = document.createElement('p');
     only.className = 'fb-note';
@@ -5848,6 +6152,185 @@ function renderSettings(holder, data) {{
   filesNote.textContent = 'Log: ' + (data.log || 'unavailable') +
     String.fromCharCode(10) + 'Settings: ' + (data.settings_file || 'unavailable');
   files.appendChild(filesNote);
+}}
+
+function compShots(n) {{
+  return n === 1 ? '1 screenshot' : n.toLocaleString() + ' screenshots';
+}}
+
+function renderComposition(holder, comp) {{
+  const folders = comp.folders || [];
+  const find = name => folders.filter(f => f.name === name)[0] || null;
+  const chosen = {{}};
+  (comp.also || []).forEach(name => {{ chosen[name] = true; }});
+
+  const section = settingsRow(holder, 'Your character');
+
+  // Name the primary first and say what it controls. Without this the panel
+  // opened straight into a list of folders with nothing stating what they were
+  // relative to, which read as a second character switcher sitting above the
+  // real one.
+  const primary = document.createElement('p');
+  primary.className = 'fb-release-notes';
+  primary.style.cssText = 'font-size:1.05rem;margin-bottom:2px';
+  primary.textContent = comp.current;
+  section.appendChild(primary);
+
+  const primaryNote = document.createElement('p');
+  primaryNote.className = 'fb-note';
+  primaryNote.style.marginTop = '0';
+  primaryNote.textContent = 'Your current account name, and the one looked up on the hiscores. Levels, XP, Road to Max and pace all come from this name.';
+  section.appendChild(primaryNote);
+
+  const summary = document.createElement('p');
+  summary.className = 'fb-release-notes';
+  section.appendChild(summary);
+
+  const heading = document.createElement('p');
+  heading.className = 'fb-release-notes';
+  heading.style.cssText = 'margin-top:14px;margin-bottom:2px';
+  heading.textContent = 'Has ' + comp.current + ' had other names?';
+  section.appendChild(heading);
+
+  const intro = document.createElement('p');
+  intro.className = 'fb-note';
+  intro.style.marginTop = '0';
+  intro.textContent = 'RuneLite starts a new folder when you change your name. Tick any folder below that was this same character, and its screenshots join the story above. Leave the rest alone — anything unticked stays a separate account.';
+  section.appendChild(intro);
+
+  const list = document.createElement('div');
+  section.appendChild(list);
+  const modeWrap = document.createElement('details');
+  const modeSummary = document.createElement('summary');
+  modeSummary.style.cssText = 'cursor:pointer;font-size:.8rem;opacity:.75;margin:6px 0';
+  modeWrap.appendChild(modeSummary);
+  const modeList = document.createElement('div');
+  modeWrap.appendChild(modeList);
+  section.appendChild(modeWrap);
+
+  const warn = document.createElement('div');
+  warn.className = 'fb-note';
+  warn.style.cssText = 'border:1px solid #c96a5a;padding:10px 12px;margin-top:10px;display:none';
+  section.appendChild(warn);
+  const ack = document.createElement('input');
+  ack.type = 'checkbox';
+  ack.className = 'comp-check';
+
+  const actions = document.createElement('div');
+  actions.className = 'fb-actions';
+  actions.style.justifyContent = 'flex-start';
+  const save = document.createElement('button');
+  save.className = 'feedback-btn';
+  save.textContent = 'Save and refresh';
+  actions.appendChild(save);
+  section.appendChild(actions);
+
+  function selectedNames() {{
+    return Object.keys(chosen).filter(name => chosen[name]);
+  }}
+
+  function update() {{
+    const names = [comp.current].concat(selectedNames());
+    const modes = {{}};
+    let total = 0;
+    names.forEach(name => {{
+      const f = find(name);
+      if (f) {{ modes[f.mode] = true; total += f.shots; }}
+    }});
+    const modeCount = Object.keys(modes).length;
+    const extra = selectedNames().length;
+    summary.textContent = extra
+      ? 'Built from ' + comp.current + ' plus ' + extra + ' other folder' + (extra > 1 ? 's' : '') + ' — ' + compShots(total)
+      : 'Built from ' + comp.current + ' alone — ' + compShots(total);
+
+    if (modeCount > 1) {{
+      warn.style.display = '';
+      warn.textContent = '';
+      const head = document.createElement('strong');
+      head.style.color = '#c96a5a';
+      head.textContent = 'This mixes ' + modeCount + ' different game modes. ';
+      warn.appendChild(head);
+      warn.appendChild(document.createTextNode(
+        'Wealth totals will include loot that was never on your main, pace and Road to Max will be distorted, and the hiscores only answer for your current character. Screenshots, Chronicle and Gallery stay accurate, so this is a fine way to browse everything you have done — just do not read the numbers as your main account.'));
+      const ackLabel = document.createElement('label');
+      ackLabel.style.cssText = 'display:flex;gap:8px;margin-top:8px;cursor:pointer';
+      ackLabel.appendChild(ack);
+      ackLabel.appendChild(document.createTextNode('I understand these numbers will be mixed.'));
+      warn.appendChild(ackLabel);
+      save.disabled = !ack.checked;
+    }} else {{
+      warn.style.display = 'none';
+      ack.checked = false;
+      save.disabled = false;
+    }}
+  }}
+
+  ack.onchange = update;
+
+  function addOption(folder, container) {{
+    const label = document.createElement('label');
+    label.style.cssText = 'display:flex;align-items:center;gap:9px;padding:6px 2px;cursor:pointer;font-size:.9rem';
+    const box = document.createElement('input');
+    box.type = 'checkbox';
+    box.className = 'comp-check';
+    box.checked = !!chosen[folder.name];
+    box.onchange = () => {{ chosen[folder.name] = box.checked; update(); }};
+    label.appendChild(box);
+    label.appendChild(document.createTextNode(folder.name));
+    if (folder.mode) {{
+      const tag = document.createElement('span');
+      tag.style.cssText = 'font-size:.7rem;opacity:.7;border:1px solid currentColor;padding:0 5px';
+      tag.textContent = folder.mode;
+      label.appendChild(tag);
+    }}
+    const meta = document.createElement('span');
+    meta.style.cssText = 'margin-left:auto;opacity:.6;font-size:.75rem';
+    meta.textContent = compShots(folder.shots);
+    label.appendChild(meta);
+    container.appendChild(label);
+  }}
+
+  let modeCount = 0;
+  let plainCount = 0;
+  folders.forEach(folder => {{
+    if (folder.name === comp.current) return;
+    if (folder.mode) {{ addOption(folder, modeList); modeCount++; }}
+    else {{ addOption(folder, list); plainCount++; }}
+  }});
+  if (!plainCount) {{
+    const none = document.createElement('p');
+    none.className = 'fb-note';
+    none.textContent = 'No other folders found under a different name.';
+    list.appendChild(none);
+  }}
+  modeWrap.style.display = modeCount ? '' : 'none';
+  modeSummary.textContent = 'Show other game modes (' + modeCount + ')';
+
+  save.onclick = async () => {{
+    const note = switchNote(section);
+    note.textContent = 'Saving...';
+    save.disabled = true;
+    try {{
+      const response = await fetch('/api/composition', {{
+        method: 'POST',
+        headers: {{'Content-Type': 'application/json'}},
+        body: JSON.stringify({{also_folders: selectedNames(), acknowledged: ack.checked}})
+      }});
+      const result = await response.json();
+      if (!result.ok) {{
+        note.textContent = result.message || 'That could not be saved.';
+        save.disabled = false;
+        return;
+      }}
+      note.textContent = 'Saved. Rebuilding the dashboard...';
+      refreshDashboard();
+    }} catch (_error) {{
+      note.textContent = 'Could not reach the local service.';
+      save.disabled = false;
+    }}
+  }};
+
+  update();
 }}
 
 function switchNote(container) {{
@@ -5967,6 +6450,66 @@ async function openWhatsNew() {{
   renderReleases(holder, payload);
 }}
 
+function renderNotes(wrap, raw) {{
+  // Release notes are patch notes: a few headed groups of one-line entries,
+  // written to be skimmed. Just enough Markdown is understood to render that
+  // shape — a heading line, and bullets under it. Anything else stays a
+  // paragraph, so a release written as prose still reads correctly.
+  //
+  // Everything goes in through textContent. The body of a GitHub release is
+  // remote text, and it is never worth turning that into markup here.
+  const plain = value => value.replace(/[*_`]/g, '').trim();
+  let list = null;
+  let paragraph = null;
+
+  const endParagraph = () => {{ paragraph = null; }};
+
+  raw.trim().split(/\\r?\\n/).forEach(line => {{
+    const text = line.trim();
+    if (!text) {{ list = null; endParagraph(); return; }}
+
+    // A markdown heading, or a line that is nothing but bold text — both are
+    // used as group titles in practice and both should read as one.
+    const heading = text.match(/^#{{1,6}}\\s+(.*)$/) || text.match(/^\\*\\*(.+)\\*\\*$/);
+    if (heading) {{
+      const h = document.createElement('p');
+      h.className = 'fb-notes-head';
+      h.textContent = plain(heading[1]);
+      wrap.appendChild(h);
+      list = null;
+      endParagraph();
+      return;
+    }}
+
+    const bullet = text.match(/^[-*\\u2022]\\s+(.*)$/);
+    if (bullet) {{
+      if (!list) {{
+        list = document.createElement('ul');
+        list.className = 'fb-notes-list';
+        wrap.appendChild(list);
+      }}
+      const li = document.createElement('li');
+      li.textContent = plain(bullet[1]);
+      list.appendChild(li);
+      endParagraph();
+      return;
+    }}
+
+    // Wrapped prose is one paragraph until a blank line, not one paragraph per
+    // line — older releases were written that way and would otherwise gain a
+    // gap in the middle of a sentence.
+    if (paragraph) {{
+      paragraph.textContent = paragraph.textContent + ' ' + plain(text);
+    }} else {{
+      paragraph = document.createElement('p');
+      paragraph.className = 'fb-release-notes';
+      paragraph.textContent = plain(text);
+      wrap.appendChild(paragraph);
+    }}
+    list = null;
+  }});
+}}
+
 function renderReleases(holder, payload) {{
   holder.textContent = '';
   const releases = (payload && payload.releases) || [];
@@ -6001,10 +6544,7 @@ function renderReleases(holder, payload) {{
     }}
     wrap.appendChild(head);
     if (release.notes) {{
-      const notes = document.createElement('p');
-      notes.className = 'fb-release-notes';
-      notes.textContent = release.notes.trim();
-      wrap.appendChild(notes);
+      renderNotes(wrap, release.notes);
     }}
     holder.appendChild(wrap);
   }});
@@ -6046,7 +6586,16 @@ async function refreshDashboard() {{
 }}
 
 function screenshotPath(item) {{
-  return item && (item.path || item.src) || '';
+  // The favourite key, not the renderable path. A screenshot inside the
+  // primary folder renders as 'Boss Kills/x.png' and one merged in from a
+  // former name renders as '../OldName/Boss Kills/x.png', but both must be
+  // remembered by the same identity whatever the account is composed of.
+  // Deriving it here rather than stamping it onto every item collection means
+  // the gallery, the lightbox and every showcase agree by construction.
+  const src = (item && (item.path || item.src)) || '';
+  if (!src) return '';
+  if (src.indexOf('../') === 0) return src.slice(3);
+  return PRIMARY_FOLDER + '/' + src;
 }}
 
 function makeFavoriteButton(item) {{
@@ -6094,7 +6643,7 @@ function filterGallery(reset = true) {{
   const search = document.getElementById('gallery-search').value.toLowerCase();
   activeItems = GALLERY.filter(item => {{
     const matchCat = activeFilter === 'All'
-      || (activeFilter === 'Favorites' && favoritePaths.has(item.path))
+      || (activeFilter === 'Favorites' && favoritePaths.has(screenshotPath(item)))
       || item.cat === activeFilter;
     const matchSearch = !search || item.label.toLowerCase().includes(search) || item.cat.toLowerCase().includes(search);
     return matchCat && matchSearch;
@@ -6144,7 +6693,7 @@ function renderFavoriteShowcase() {{
   const count = document.getElementById('favorite-showcase-count');
   if (!section || !grid || !appInteractive) return;
   const favorites = GALLERY
-    .filter(item => favoritePaths.has(item.path))
+    .filter(item => favoritePaths.has(screenshotPath(item)))
     .sort((a, b) => (b.sort || '').localeCompare(a.sort || ''));
   section.style.display = favorites.length ? '' : 'none';
   count.textContent = favorites.length + ' saved';
@@ -6998,7 +7547,7 @@ def generate_dashboard():
         print(f"  - Override SCREENSHOTS_PATH in config.py if your folder lives elsewhere")
         return {"ok": False, "message": "Screenshot folder not found."}
 
-    data = scan_screenshots(SCREENSHOTS_PATH)
+    data = scan_screenshots(SCREENSHOTS_PATH, merge_folders=MERGE_FOLDERS)
 
     if data["total"] == 0:
         print("No screenshots found in that folder.")
@@ -7009,8 +7558,9 @@ def generate_dashboard():
 
     hiscores = fetch_hiscores(PLAYER_NAME, debug=False)
     newly_seen_bosses = update_known_bosses(hiscores.get("boss_names", []))
-    xp_history = update_xp_history(hiscores)
-    favorite_paths = load_favorite_paths()
+    xp_history = merge_xp_history(update_xp_history(hiscores), MERGE_FOLDERS)
+    warn_if_name_is_stale(hiscores, xp_history, PLAYER_NAME)
+    favorite_paths = load_all_favorites(SCREENSHOTS_PATH, MERGE_FOLDERS)
     acquisitions = build_economic_acquisitions(data, VALUE_COMPONENT_OVERRIDES)
     if FORCE_BOSS_DATA_REFRESH:
         _force_bosses = [name for name in hiscores.get("boss_names", []) if name]
