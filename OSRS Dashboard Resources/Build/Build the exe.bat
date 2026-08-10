@@ -1,11 +1,11 @@
 @echo off
 REM ============================================================
 REM   Build the OSRS Dashboard clan .exe  (run this on Windows)
-REM   Output lands in the "Clan Package" folder next to this file.
+REM   Output lands in the "Output" folder next to this file.
 REM   Step 1 refreshes drop tables from the wiki; Step 2 compiles.
 REM ============================================================
 setlocal
-cd /d "%~dp0..\_engine"
+cd /d "%~dp0..\..\_engine"
 
 echo(
 echo Step 1 of 2: refreshing drop tables from the OSRS Wiki...
@@ -44,7 +44,7 @@ if errorlevel 1 (
 :: Before touching this line, read DESIGN.md and GitHub issue #2.
 python -m PyInstaller --onefile --windowed ^
   --name "OSRS Dashboard" ^
-  --icon "%~dp0..\_engine\icon.ico" ^
+  --icon "%~dp0..\..\_engine\icon.ico" ^
   --hidden-import version ^
   --hidden-import console ^
   --hidden-import settings ^
@@ -54,21 +54,21 @@ python -m PyInstaller --onefile --windowed ^
   --hidden-import economic_value ^
   --hidden-import value_recipes ^
   --hidden-import wiki_discovery ^
-  --add-data "%~dp0..\OSRS Dashboard Resources\chart.umd.min.js;." ^
-  --add-data "%~dp0..\OSRS Dashboard Resources\Cinzel-Latin.woff2;." ^
-  --add-data "%~dp0..\OSRS Dashboard Resources\CrimsonText-Regular-Latin.woff2;." ^
-  --add-data "%~dp0..\OSRS Dashboard Resources\CrimsonText-Semibold-Latin.woff2;." ^
-  --add-data "%~dp0..\OSRS Dashboard Resources\CrimsonText-Italic-Latin.woff2;." ^
-  --distpath "%~dp0Clan Package" ^
+  --add-data "%~dp0..\chart.umd.min.js;." ^
+  --add-data "%~dp0..\Cinzel-Latin.woff2;." ^
+  --add-data "%~dp0..\CrimsonText-Regular-Latin.woff2;." ^
+  --add-data "%~dp0..\CrimsonText-Semibold-Latin.woff2;." ^
+  --add-data "%~dp0..\CrimsonText-Italic-Latin.woff2;." ^
+  --distpath "%~dp0Output" ^
   --workpath "%~dp0_build" ^
   --specpath "%~dp0_build" ^
   dashboard_app.py
 if errorlevel 1 goto :build_failed
 
 echo(
-if exist "%~dp0Clan Package\OSRS Dashboard.exe" (
+if exist "%~dp0Output\OSRS Dashboard.exe" (
   echo ============================================================
-  echo   DONE. The exe is in the "Clan Package" folder, with fresh
+  echo   DONE. The exe is in the "Output" folder, with fresh
   echo   drop tables and offline chart support baked in.
   echo(
   echo   TO RELEASE IT:

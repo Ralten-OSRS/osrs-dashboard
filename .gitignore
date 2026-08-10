@@ -6,15 +6,19 @@ __pycache__/
 *.py[cod]
 
 # Build products and historical archives are preserved on disk, but are not
-# duplicated into Git history.
+# duplicated into Git history. Everything local now lives under Resources in
+# named subfolders (August 9, 2026), so these rules point at whole folders
+# rather than at individual files scattered through a mixed directory.
 _Archive/
-Distribution/_Archive/
-Distribution/_build/
-# The whole package folder is build output now. Releases is the distribution
+# Compiled output and PyInstaller scratch. Releases is the distribution
 # channel, so nothing in here is worth versioning: the exe is attached to a
 # release and the README that used to ship beside it had no reader once people
 # started downloading a single file rather than a folder.
-Distribution/Clan Package/
+OSRS Dashboard Resources/Build/Output/
+OSRS Dashboard Resources/Build/_build/
+# Every package that has ever shipped, plus superseded build scripts. Pinned
+# releases live here and are exempt from archive pruning.
+OSRS Dashboard Resources/Shipped Builds/
 
 # Workspace operating files describe how the project is worked on rather than
 # how the dashboard works, and they stay on the local machine. Naming them one
@@ -26,17 +30,12 @@ Distribution/Clan Package/
 *.md
 !README.md
 
-# Resources now holds runtime assets only — the pinned Chart.js and the fonts
-# embedded into every generated dashboard. Design records moved to
-# _Archive/Redesign 2026-08/, which is already ignored, so the per-file rules
-# that used to live here are gone.
+# Resources holds all local material for this project, in named subfolders per
+# the create-project convention. What ships from it is the runtime assets at
+# its top level — the pinned Chart.js and the four webfonts embedded into every
+# generated dashboard — plus the build script under Build/. Each subfolder is
+# uniformly published or local; nothing mixes at the file level.
 OSRS Dashboard Resources/.gitkeep
-
-# This repository is the source of truth for the code, so the copied source
-# folder that used to ship inside the clan package is retired.
-Distribution/Clan Package/Source Code (for the curious)/
-Distribution/0 - READ ME FIRST*
-Distribution/Source Code README.txt
 
 # Local editor and operating-system noise.
 .DS_Store

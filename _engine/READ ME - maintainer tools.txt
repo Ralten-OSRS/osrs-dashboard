@@ -3,8 +3,8 @@ These are maintainer tools, not things you need to run.
 Update Drop Tables.bat
   Re-reads every boss drop table, rate, category and Combat Achievement
   list from the OSRS Wiki into _engine/boss_drops_generated.py, which is
-  what a build bundles. You rarely need this by hand: Distribution/
-  1 - BUILD THE EXE.bat runs it automatically before every build, and the
+  what a build bundles. You rarely need this by hand: the build
+  script runs it automatically before every build, and the
   dashboard looks up bosses it has never seen on its own as you play.
   Reach for it only to refresh bundled tables without doing a full build.
 
