@@ -132,10 +132,13 @@ def _boss_refresh_progress(position, total, boss):
     """Print one line per boss during a forced refresh so it never looks hung."""
     print(f"  [{position}/{total}] {boss}")
 
-# Road to Max forecasting uses a rolling two-week window: responsive enough
-# to follow a real playstyle change, but less volatile than a single week.
+# Road to Max keeps two different clocks on purpose. Recent pace stays
+# responsive to the current grind, while the headline forecast uses eight
+# weeks of actual XP-to-max reduction so changing skills does not rewrite the
+# account's likely finish date every few days.
 PACE_WINDOW_DAYS = 14
-PACE_EARLY_MIN_DAYS = 7
+MAX_FORECAST_WINDOW_DAYS = 56
+MAX_FORECAST_MIN_DAYS = 28
 ETA_USEFUL_MAX_DAYS = 365 * 3
 ACTIVE_XP_FLOOR = 100_000
 
@@ -424,6 +427,63 @@ def compute_pace(history, window_days=PACE_WINDOW_DAYS):
         if xp_then is not None and xp_now > xp_then:
             rates[skill] = (xp_now - xp_then) / span
     return rates, span
+
+
+def compute_max_forecast(history, window_days=MAX_FORECAST_WINDOW_DAYS,
+                         min_span_days=MAX_FORECAST_MIN_DAYS):
+    """Stable account-level max forecast from reduction in XP still needed.
+
+    The baseline is the snapshot nearest the requested horizon, subject to a
+    minimum useful span. Capping every skill at MAX_XP means post-99 XP cannot
+    make the account appear closer to max, while skills completed during the
+    window still contribute their final progress. The ETA is anchored to the
+    latest snapshot date so an offline rebuild cannot slide the forecast.
+    """
+    valid = []
+    for entry in history:
+        try:
+            entry_dt = datetime.strptime(entry["date"], "%Y-%m-%d")
+        except (KeyError, TypeError, ValueError):
+            continue
+        if isinstance(entry.get("xp"), dict):
+            valid.append((entry_dt, entry))
+    if len(valid) < 2:
+        return {"rate": 0, "span": 0, "remaining": 0,
+                "progress": 0, "eta_days": None, "eta_date": None}
+
+    valid.sort(key=lambda item: item[0])
+    latest_dt, latest = valid[-1]
+    candidates = []
+    for entry_dt, entry in valid[:-1]:
+        span = (latest_dt - entry_dt).days
+        if span >= min_span_days:
+            candidates.append((abs(span - window_days), -span, span, entry))
+
+    remaining_now = sum(
+        max(MAX_XP - int(xp), 0)
+        for xp in latest.get("xp", {}).values()
+        if isinstance(xp, (int, float))
+    )
+    if not candidates:
+        available_span = max((latest_dt - item[0]).days for item in valid[:-1])
+        return {"rate": 0, "span": available_span, "remaining": remaining_now,
+                "progress": 0, "eta_days": None, "eta_date": None}
+
+    _, _, span, baseline = min(candidates, key=lambda item: (item[0], item[1]))
+    progress = 0
+    for skill, xp_now in latest.get("xp", {}).items():
+        xp_then = baseline.get("xp", {}).get(skill)
+        if not isinstance(xp_now, (int, float)) or not isinstance(xp_then, (int, float)):
+            continue
+        before = max(MAX_XP - int(xp_then), 0)
+        after = max(MAX_XP - int(xp_now), 0)
+        progress += max(before - after, 0)
+
+    rate = progress / span if progress > 0 and span > 0 else 0
+    eta_days = int(remaining_now / rate + 0.5) if remaining_now and rate else None
+    eta_date = latest_dt + timedelta(days=eta_days) if eta_days is not None else None
+    return {"rate": rate, "span": span, "remaining": remaining_now,
+            "progress": progress, "eta_days": eta_days, "eta_date": eta_date}
 
 
 def compute_account_pulse(history, window_days):
@@ -2290,30 +2350,28 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
     road_to_max.sort(key=_rtm_sort_key)
     road_to_max_json = road_to_max
 
-    # Headline projections for the Road to Max tab
+    # Recent pace describes the current grind. The headline forecast is a
+    # separate, steadier account-level measure so a fast Hunter week is not
+    # silently applied to every slower skill still remaining.
     total_rate = sum(qualified_max_progress_rates.values())
+    max_forecast = compute_max_forecast(xp_history)
+    forecast_span = max_forecast["span"]
     max_eta_str = ""
     max_eta_label = "Building History"
-    if total_xp_remaining and total_rate > 0 and pace_span >= PACE_EARLY_MIN_DAYS:
-        max_days = int(total_xp_remaining / total_rate + 0.5)
-        max_eta_str = (datetime.now() + timedelta(days=max_days)).strftime("%B %Y")
-        max_eta_label = "Projected Max" if pace_span >= PACE_WINDOW_DAYS else "Early Estimate"
+    if (max_forecast["eta_date"] is not None
+            and max_forecast["eta_days"] <= ETA_USEFUL_MAX_DAYS):
+        max_eta_str = max_forecast["eta_date"].strftime("%B %Y")
+        max_eta_label = ("Projected Max" if forecast_span >= MAX_FORECAST_WINDOW_DAYS
+                         else "Early Estimate")
+    elif forecast_span >= MAX_FORECAST_MIN_DAYS:
+        max_eta_label = "No stable projection"
     pace_headline = fmt_gp(int(total_rate)) if total_rate > 0 else "—"
+    pace_card_label = f"{pace_span}-day recent pace" if pace_span else "Recent XP / day"
+    forecast_card_label = (
+        f"{max_eta_label} · {forecast_span}-day trend"
+        if forecast_span else max_eta_label
+    )
     total_xp_rem_str = fmt_gp(total_xp_remaining) if total_xp_remaining else "—"
-    if qualified_max_progress_rates and pace_span < PACE_EARLY_MIN_DAYS:
-        pace_note_html = f'<p class="rtm-pace-note">Pace measured over the last {pace_span} days. The max forecast unlocks at 7 days and settles into a rolling 14-day view.</p>'
-    elif qualified_max_progress_rates and pace_span < PACE_WINDOW_DAYS:
-        pace_note_html = f'<p class="rtm-pace-note">Early estimate from {pace_span} days of XP snapshots. It becomes the rolling 14-day projection as history fills in.</p>'
-    elif qualified_max_progress_rates:
-        pace_note_html = f'<p class="rtm-pace-note">Projection uses the most recent {pace_span} days inside the rolling 14-day window. ETAs assume that recent pace holds.</p>'
-    elif max_progress_rates:
-        max_eta_label = "No recent max progress"
-        pace_note_html = f'<p class="rtm-pace-note">Recent XP in unmaxed skills was too small to treat as an active maxing pace.</p>'
-    elif pace_rates:
-        max_eta_label = "No recent max progress"
-        pace_note_html = f'<p class="rtm-pace-note">Recent XP was earned only in already-maxed skills, so it does not move the max projection.</p>'
-    else:
-        pace_note_html = '<p class="rtm-pace-note">Pace tracking builds automatically. Refresh on different days to establish a recent trajectory; the max forecast unlocks at 7 days.</p>'
     # Daily XP gained — the road-to-max story is velocity, not the near-flat
     # cumulative total (which is so large that a strong session barely nudges
     # the line and every axis label rounds to the same "409M"). Each bar is
@@ -5024,7 +5082,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   .journey-controls button,.boss-category-tabs button,.boss-controls button {{ height:30px; padding:0 9px; border:1px solid var(--border-bright); background:#0d0e0b; color:#c8bfae; cursor:pointer; font:600 8px 'Cinzel',serif; text-transform:uppercase; }}
   .journey-controls button:hover,.journey-controls button.active,.boss-category-tabs button:hover,.boss-category-tabs button.active,.boss-controls button:hover {{ color:var(--gold-bright); border-color:var(--gold); background:#2a210d; }}
   .journey-focus-shell {{ overflow:auto; padding-top:11px; }}
-  #journey-focus-map {{ min-width:760px; }}
+  #journey-focus-map {{ width:max(100%,var(--journey-min-width,760px)); min-width:760px; }}
   .journey-axis,.journey-focus-row {{ width:100%; box-sizing:border-box; display:grid; grid-template-columns:100px repeat(var(--month-count),minmax(18px,1fr)); gap:3px; align-items:center; }}
   .journey-axis {{ margin-bottom:5px; }}
   .journey-axis span {{ color:var(--text-dim); font:9px 'Segoe UI',Arial,sans-serif; text-align:center; }}
@@ -5311,7 +5369,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
     <article class="card home-next-card">
       <div class="home-section-head"><div><span>The road ahead</span><h2>Next Chapter</h2></div></div>
       <div class="home-next-number">{total_xp_rem_str}</div><p>XP remains across {len(road_to_max)} skills.</p>
-      <div class="home-next-stats"><div><strong>{pace_headline}</strong><span>Current pace</span></div><div><strong>{max_eta_str or "—"}</strong><span>{max_eta_label}</span></div></div>
+      <div class="home-next-stats"><div><strong>{pace_headline}</strong><span>Recent pace</span></div><div><strong>{max_eta_str or "—"}</strong><span>{max_eta_label}</span></div></div>
       <button class="home-text-link" onclick="goToPage('max')">See every remaining skill →</button>
     </article>
     <article class="card home-clue-card">
@@ -5387,11 +5445,11 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   <section class="journey-summary-grid">
     <article class="journey-summary-card"><span>XP</span><div><strong>{total_xp_rem_str}</strong><small>XP to max</small></div></article>
     <article class="journey-summary-card"><span>Skills</span><div><strong>{len(road_to_max)}</strong><small>Skills left</small></div></article>
-    <article class="journey-summary-card"><span>Pace</span><div><strong>{pace_headline}</strong><small>XP per day</small></div></article>
-    <article class="journey-summary-card"><span>ETA</span><div><strong>{max_eta_str or "—"}</strong><small>{max_eta_label}</small></div></article>
+    <article class="journey-summary-card"><span>Pace</span><div><strong>{pace_headline}</strong><small>{pace_card_label}</small></div></article>
+    <article class="journey-summary-card"><span>ETA</span><div><strong>{max_eta_str or "—"}</strong><small>{forecast_card_label}</small></div></article>
   </section>
   <section class="card journey-road-card">
-    <div class="section-heading"><div><h2>Road to Max</h2><p>Current hiscores, recent pace, and XP-based progress.</p></div><span>Current hiscores snapshot</span></div>
+    <div class="section-heading"><div><h2>Road to Max</h2><p>Current hiscores, recent momentum, and a steadier eight-week max projection.</p></div><span>Current hiscores snapshot</span></div>
     <div class="journey-road-layout"><div id="rtm-detail"></div><div class="journey-xp-panel"><h3>Daily XP Gained</h3><canvas id="xpTrendChart" height="160"></canvas><p class="empty-note" id="xp-trend-note" style="display:none">No trend to draw yet — a gain bar appears once you've refreshed on two different days.</p></div></div>
   </section>
   <section class="card account-journey-card">
@@ -7011,7 +7069,10 @@ function renderJourneyFocus() {{
   if (!JOURNEY_EVENTS.length) {{ map.innerHTML = '<p class="empty-note">No dated level screenshots are available.</p>'; return; }}
   const months = journeyMonths();
   const fullTimelineWidth = 103 + (months.length * 21);
-  map.style.width = Math.max(760, map.parentElement.clientWidth, fullTimelineWidth) + 'px';
+  // CSS owns the available width so this remains correct even though the
+  // Journey page is hidden during initialization. Wider timelines still keep
+  // the existing horizontal scroll and the all-skills view remains the default.
+  map.style.setProperty('--journey-min-width', Math.max(760, fullTimelineWidth) + 'px');
   const monthSet = new Set(months);
   const inRange = JOURNEY_EVENTS.filter(event => monthSet.has(event.month));
   const skills = [...new Set(inRange.map(event => event.skill))].sort((a, b) => a.localeCompare(b));
