@@ -7798,7 +7798,21 @@ function closeNavigation() {{
   document.getElementById('nav-scrim').classList.remove('open');
 }}
 
-function switchPage(id, btn) {{
+// The open page is kept in the address bar as #bosses, #loot and so on. That
+// is what lets the browser's Back and Forward buttons move between pages, and
+// what brings a reload, including the one that follows Refresh, back to the
+// page that was open instead of to Stats. Only the fragment changes, so it
+// works the same from the local service and from the file opened directly.
+let currentPageId = 'stats';
+
+function pageIdFromAddress() {{
+  const id = window.location.hash.slice(1);
+  return PAGE_HEADINGS[id] && document.getElementById('page-' + id) ? id : '';
+}}
+
+function switchPage(id, btn, fromHistory) {{
+  const changed = id !== currentPageId;
+  currentPageId = id;
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
   document.getElementById('page-' + id).classList.add('active');
@@ -7813,12 +7827,21 @@ function switchPage(id, btn) {{
   if (id === 'loot') renderLoot();
   if (id === 'bosses') renderBosses();
   if (id === 'chronicle') renderChronicle();
+  if (changed && !fromHistory) {{
+    try {{ history.pushState(null, '', '#' + id); }}
+    catch (error) {{ window.location.hash = id; }}
+  }}
 }}
 
-function goToPage(id) {{
+function goToPage(id, fromHistory) {{
   const btn = Array.from(document.querySelectorAll('#side-rail .nav-item')).find(item => item.getAttribute('onclick').includes("'" + id + "'"));
-  if (btn) switchPage(id, btn);
+  if (btn) switchPage(id, btn, fromHistory);
 }}
+
+window.addEventListener('hashchange', () => {{
+  const id = pageIdFromAddress() || 'stats';
+  if (id !== currentPageId) goToPage(id, true);
+}});
 
 document.addEventListener('keydown', event => {{
   if (event.key === 'Escape') closeNavigation();
@@ -7827,6 +7850,7 @@ document.addEventListener('keydown', event => {{
 // Initialize the static gallery immediately, then enable durable interaction
 // when the private local service is available.
 initializeDashboardApp();
+if (pageIdFromAddress() && pageIdFromAddress() !== currentPageId) goToPage(pageIdFromAddress(), true);
 </script>
 </body>
 </html>"""
