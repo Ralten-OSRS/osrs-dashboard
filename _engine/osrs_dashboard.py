@@ -5856,8 +5856,8 @@ function wealthClick(_event, elements) {{
 function fmtWealth(value) {{
   const absolute = Math.abs(value || 0);
   const sign = value < 0 ? '-' : '';
-  if (absolute >= 1e9) return sign + (absolute / 1e9).toFixed(2).replace(/\.00$/, '') + 'B';
-  if (absolute >= 1e6) return sign + (absolute / 1e6).toFixed(1).replace(/\.0$/, '') + 'M';
+  if (absolute >= 1e9) return sign + (absolute / 1e9).toFixed(2).replace(/\\.00$/, '') + 'B';
+  if (absolute >= 1e6) return sign + (absolute / 1e6).toFixed(1).replace(/\\.0$/, '') + 'M';
   if (absolute >= 1e3) return sign + Math.round(absolute / 1e3) + 'K';
   return sign + Math.round(absolute).toLocaleString();
 }}
@@ -6955,17 +6955,17 @@ function fmtPulseNumber(value) {{
   if (value >= 1e9) {{
     const digits = value >= 10e9 ? 0 : 1;
     const scaled = (value / 1e9).toFixed(digits);
-    return (digits ? scaled.replace(/\.?0+$/, '') : scaled) + 'B';
+    return (digits ? scaled.replace(/\\.?0+$/, '') : scaled) + 'B';
   }}
   if (value >= 1e6) {{
     const digits = value >= 10e6 ? 0 : 2;
     const scaled = (value / 1e6).toFixed(digits);
-    return (digits ? scaled.replace(/\.?0+$/, '') : scaled) + 'M';
+    return (digits ? scaled.replace(/\\.?0+$/, '') : scaled) + 'M';
   }}
   if (value >= 1e3) {{
     const digits = value >= 100e3 ? 0 : 1;
     const scaled = (value / 1e3).toFixed(digits);
-    return (digits ? scaled.replace(/\.?0+$/, '') : scaled) + 'K';
+    return (digits ? scaled.replace(/\\.?0+$/, '') : scaled) + 'K';
   }}
   return value.toLocaleString();
 }}
@@ -7380,7 +7380,7 @@ function renderLuckDetail(b) {{
   const detail = document.getElementById('luck-detail');
   if (!detail || !b) return;
   const color = luckColor(b);
-  const initials = b.boss.split(/\s+/).map(word => word[0]).join('').slice(0, 2);
+  const initials = b.boss.split(/\\s+/).map(word => word[0]).join('').slice(0, 2);
   const bossImage = LUCK_BOSS_IMAGES[b.boss] || '';
   const bossVisual = bossImage ? '<button class="luck-detail-image" data-luck-boss-image="true" aria-label="Open ' + b.boss + ' screenshot"><img src="' + bossImage + '" alt=""></button>' : '<div class="luck-detail-visual">' + initials + '</div>';
   const owned = b.items.filter(it => it.owned).length;
@@ -7604,7 +7604,7 @@ function renderBossDirectory() {{
   if (!rows.some(item => item.index === selectedBossIndex)) selectedBossIndex = rows[0].index;
   grid.innerHTML = rows.map(item => {{
     const b = item.boss;
-    const initials = b.boss.split(/\s+/).map(word => word[0]).join('').slice(0, 2);
+    const initials = b.boss.split(/\\s+/).map(word => word[0]).join('').slice(0, 2);
     const visual = b.representative ? '<img src="' + b.representative + '" alt="" loading="lazy">' : '<span class="boss-card-monogram">' + initials + '</span>';
     return '<button class="boss-directory-card ' + (item.index === selectedBossIndex ? 'active' : '') + '" data-boss-index="' + item.index + '" onclick="selectBoss(' + item.index + ')">' + visual
       + '<span><strong>' + b.boss + '</strong><span>' + b.category + (b.kc ? ' · ' + b.kc.toLocaleString() + ' KC' : '') + '</span>'
@@ -7631,7 +7631,7 @@ function selectBoss(idx, rerender = true) {{
     }}).join('');
     evidenceHtml += '<section class="boss-evidence-section"><h3>' + section[0] + '</h3><div class="boss-evidence-grid">' + cards + '</div></section>';
   }});
-  const initials = b.boss.split(/\s+/).map(word => word[0]).join('').slice(0, 2);
+  const initials = b.boss.split(/\\s+/).map(word => word[0]).join('').slice(0, 2);
   const representativeIndex = Math.max(0, BOSS_SHOT_ITEMS.findIndex(item => item.src === b.representative));
   const visual = b.representative ? '<button class="boss-hero-shot" onclick="openBossIdx(' + representativeIndex + ')" aria-label="Open ' + b.boss + ' screenshots"><img src="' + b.representative + '" alt=""></button>' : '<div class="boss-detail-monogram">' + initials + '</div>';
   document.getElementById('boss-detail-panel').innerHTML = '<div class="boss-detail-hero-new">' + visual + '<div><h2>' + b.boss + '</h2><p>' + (b.kc ? b.kc.toLocaleString() + ' tracked kills' : 'KC unavailable') + (b.rank ? ' · Hiscores rank ' + b.rank.toLocaleString() : '') + ' · ' + b.category + '</p><p>' + (b.gp_str ? b.gp_str + ' realized value logged' : 'No realized GP attributed') + '</p></div></div>'
