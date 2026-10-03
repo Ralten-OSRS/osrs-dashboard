@@ -5241,7 +5241,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   .fav-columns span:last-child,.fav-rank {{ min-width:58px; }}
   .fav-rank {{ font-size:0.8rem; color:var(--text-dim); text-align:right; }}
   .rtm-remaining.fav-sorted,.fav-rank.fav-sorted {{ color:var(--gold); }}
-  .home-scroll-card #fav-bosses.has-ranks {{ max-height:306px; scrollbar-gutter:stable; }}
+  .home-scroll-card #fav-bosses.has-ranks {{ max-height:302px; scrollbar-gutter:stable; }}
   .home-activity-card {{ order:7; margin:0 !important; padding:15px 16px; }}
   .home-activity-card canvas {{ max-height:190px; }}
   .stats-story-row {{ order:8; margin:0 !important; }}
@@ -5502,6 +5502,22 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
     .boss-directory-pane,.luck-list-panel {{ position:sticky; top:76px; align-self:start; }}
     .boss-card-grid {{ max-height:max(320px,calc(100vh - 212px)); }}
     .luck-list {{ max-height:max(320px,calc(100vh - 131px)); }}
+  }}
+
+  /* ── One style for every sort, filter and range choice ─────────────────
+     These controls were added page by page and had drifted into seven
+     variants: three heights, two weights, three type sizes, and some in
+     capitals where others were not. They all do the same job, choosing one
+     of a few views, so they share one look. */
+  .page :is(.pulse-window-btn,.wealth-control,.luck-sort-controls button,.journey-controls button,.boss-category-tabs button,.boss-sort-row button,.filter-btn,.chron-filter-btn,.chron-year-chip) {{
+    height:30px; padding:0 11px; border:1px solid var(--border-bright); border-radius:0; background:#0d0e0b; color:#c8bfae; box-shadow:none;
+    font:600 11px 'Cinzel',serif; letter-spacing:.4px; text-transform:uppercase; white-space:nowrap; cursor:pointer;
+  }}
+  .page :is(.pulse-window-btn,.wealth-control,.luck-sort-controls button,.journey-controls button,.boss-category-tabs button,.boss-sort-row button,.filter-btn,.chron-filter-btn,.chron-year-chip):hover {{
+    color:var(--gold); border-color:var(--gold-dim); background:#0d0e0b;
+  }}
+  .page :is(.pulse-window-btn,.wealth-control,.luck-sort-controls button,.journey-controls button,.boss-category-tabs button,.boss-sort-row button,.filter-btn,.chron-filter-btn).active {{
+    color:var(--gold-bright); border-color:var(--gold); background:#2a210d; box-shadow:none;
   }}
 </style>
 </head>
@@ -7008,7 +7024,9 @@ function filterGallery(reset = true) {{
 
 function setFilter(cat, btn) {{
   activeFilter = cat;
-  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  // Scoped to the Gallery: the Loot Log's sort buttons share this class, and
+  // clearing every one of them left that page with no sort marked as chosen.
+  document.querySelectorAll('.gallery-controls .filter-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   filterGallery();
 }}
