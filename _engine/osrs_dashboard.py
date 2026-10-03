@@ -5490,6 +5490,19 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
     .boss-evidence-stats {{ grid-template-columns:1fr; }}
     .boss-evidence-grid {{ grid-template-columns:1fr; }}
   }}
+
+  /* ── Bosses and Luck: keep the list beside its detail ──────────────────
+     Both pages are a list on the left and a detail panel on the right. The
+     list scrolled inside a fixed box while the page scrolled as well, so
+     reading down a long detail panel carried the list off the top of the
+     screen. The list column now stays pinned under the header and is as tall
+     as the window allows, so the next boss is always one click away. This
+     only applies where the two sit side by side. */
+  @media (min-width:901px) {{
+    .boss-directory-pane,.luck-list-panel {{ position:sticky; top:76px; align-self:start; }}
+    .boss-card-grid {{ max-height:max(320px,calc(100vh - 212px)); }}
+    .luck-list {{ max-height:max(320px,calc(100vh - 131px)); }}
+  }}
 </style>
 </head>
 <body>
@@ -7630,6 +7643,7 @@ document.getElementById('luck-list')?.addEventListener('click', event => {{
   if (!row) return;
   selectedLuckBoss = row.dataset.luckBoss;
   renderLuck();
+  showDetailFromTop(document.getElementById('luck-detail'));
 }});
 renderLuck();
 
@@ -7801,6 +7815,15 @@ function renderBossDirectory() {{
   selectBoss(selectedBossIndex, false);
 }}
 
+// With the list pinned, a boss can be chosen while the page is scrolled deep
+// into the previous one's evidence. Bring the top of the new detail back
+// under the header so it is read from the start.
+function showDetailFromTop(panel) {{
+  if (!panel) return;
+  const top = panel.getBoundingClientRect().top;
+  if (top < 76) window.scrollTo({{top: window.scrollY + top - 86, left: 0, behavior: 'instant'}});
+}}
+
 function selectBoss(idx, rerender = true) {{
   selectedBossIndex = idx;
   document.querySelectorAll('.boss-directory-card').forEach(card => card.classList.toggle('active', Number(card.dataset.bossIndex) === idx));
@@ -7824,6 +7847,7 @@ function selectBoss(idx, rerender = true) {{
   document.getElementById('boss-detail-panel').innerHTML = '<div class="boss-detail-hero-new">' + visual + '<div><h2>' + b.boss + '</h2><p>' + (b.kc ? b.kc.toLocaleString() + ' tracked kills' : (b.virtual ? 'Drops shared between bosses' : 'KC unavailable')) + (b.rank ? ' · Hiscores rank ' + b.rank.toLocaleString() : '') + ' · ' + b.category + '</p><p>' + (b.gp_str ? b.gp_str + ' realized value logged' : 'No realized GP attributed') + '</p></div></div>'
     + '<div class="boss-evidence-stats"><div><strong>' + b.evidence_count + '</strong><span>Evidence items</span></div><div><strong>' + b.drops.length + '</strong><span>Valuable drops</span></div><div><strong>' + (b.ca_captured || 0) + (b.ca_total ? ' / ' + b.ca_total : '') + '</strong><span>CA screenshots / Wiki tasks</span></div></div>'
     + (evidenceHtml || '<p class="empty-note">No screenshots captured for this boss yet.</p>');
+  if (rerender) showDetailFromTop(document.getElementById('boss-detail-panel'));
 }}
 
 function openBossIdx(idx) {{
