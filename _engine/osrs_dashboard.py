@@ -1436,6 +1436,65 @@ def parse_valuable_drop(filename):
     return None, 1, 0
 
 
+# RuneLite appends a timestamp to every screenshot it saves, and sometimes a
+# "(2)" when two land in the same second. On a card that timestamp is noise:
+# the formatted date is printed underneath, and at card width it pushes the
+# part worth reading (the item, the quest, the skill) off the end of the line.
+_TRAILING_STAMP_RE = re.compile(
+    r'[\s_]*(?:'
+    r'\d{4}-\d{2}-\d{2}(?:[ _]\d{2}-\d{2}-\d{2}| at \d{1,2}\.\d{2}\.\d{2} (?:AM|PM)| \d{6})?'
+    r'|\d{8}_\d{6}'
+    r')\s*(?:\(\d+\))?\s*$',
+    re.IGNORECASE,
+)
+_TITLE_FALLBACKS = {"Manual Screenshots": "Manual screenshot"}
+
+
+def display_title(filename, category):
+    """Readable title for a screenshot card: the filename with its timestamp
+    removed and the category's own prefix dropped, since the card already names
+    the category. The file on disk is never renamed, and Gallery search still
+    matches the original filename through the screenshot's path."""
+    title = Path(filename).stem
+    while True:
+        stripped = _TRAILING_STAMP_RE.sub('', title)
+        if stripped == title:
+            break
+        title = stripped
+    title = title.strip(' _-')
+
+    if category == "Level-Ups":
+        skill, level = parse_level_up(filename)
+        if skill and level:
+            return f"{skill} level {level}"
+    elif category == "Quests":
+        quest = parse_quest_name(filename)
+        if quest:
+            return quest
+    elif category == "Combat Tasks":
+        task = parse_combat_task(filename)
+        if task:
+            return task
+    elif category == "Collection Log":
+        match = re.match(r'Collection log \((.+)\)$', title, re.IGNORECASE)
+        if match:
+            return match.group(1).strip()
+    elif category == "Valuable Drops":
+        title = re.sub(r'^Valuable drop\s+', '', title, flags=re.IGNORECASE)
+    elif category == "Untradeable Drops":
+        title = re.sub(r'^Untradeable drop\s+', '', title, flags=re.IGNORECASE)
+    elif category == "Clue Scroll Rewards":
+        match = re.match(r'([A-Za-z]+)\((\d+)\)$', title)
+        if match:
+            return f"{match.group(1)} clue {match.group(2)}"
+
+    title = re.sub(r'(?<=\S)\((\d+)\)$', r' (\1)', title)
+    title = re.sub(r'\s{2,}', ' ', title).strip()
+    if not title or title.lower() == "screenshot":
+        return _TITLE_FALLBACKS.get(category, category)
+    return title
+
+
 HOME_MOMENT_CATEGORIES = {
     "Level-Ups", "Manual Screenshots", "Quests", "Clue Scroll Rewards",
     "Pets", "Valuable Drops", "Collection Log", "Untradeable Drops",
@@ -2933,7 +2992,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
             "src": item["rel_path"],
             "path": item["rel_path"],
             "cat": item["category"],
-            "label": Path(item["filename"]).stem,
+            "label": display_title(item["filename"], item["category"]),
             "ts": item["ts_str"],
             "sort": item["ts_sort"],
         })
@@ -2947,13 +3006,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
         for _moment in select_home_moments(data["gallery_items"], window_days=_days,
                                            reference_date=home_reference_date):
             _category = _moment["category"]
-            _label = Path(_moment["filename"]).stem
-            if _category == "Level-Ups":
-                _skill, _level = parse_level_up(_moment["filename"])
-                if _skill and _level:
-                    _label = f"{_skill} level {_level}"
-            elif _category == "Quests":
-                _label = parse_quest_name(_moment["filename"]) or _label
+            _label = display_title(_moment["filename"], _category)
             home_moments.append({
                 "src": _moment["rel_path"],
                 "label": _label,
@@ -6837,7 +6890,9 @@ function filterGallery(reset = true) {{
     const matchCat = activeFilter === 'All'
       || (activeFilter === 'Favorites' && favoritePaths.has(screenshotPath(item)))
       || item.cat === activeFilter;
-    const matchSearch = !search || item.label.toLowerCase().includes(search) || item.cat.toLowerCase().includes(search);
+    // The path still holds the original filename, so a search for a date or
+    // any other part of it keeps working now that the card title is shorter.
+    const matchSearch = !search || item.label.toLowerCase().includes(search) || item.cat.toLowerCase().includes(search) || item.path.toLowerCase().includes(search);
     return matchCat && matchSearch;
   }});
   renderGallery();
