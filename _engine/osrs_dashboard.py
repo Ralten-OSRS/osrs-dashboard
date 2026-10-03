@@ -5253,7 +5253,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
      its initials stand in. The generic card span rule below would otherwise
      shrink them into the corner of the tile. */
   .boss-directory-card .boss-card-monogram {{ display:grid; place-items:center; margin-top:0; color:var(--gold-bright); font:600 16px 'Cinzel',serif; }}
-  .boss-card-grid {{ display:grid; grid-template-columns:1fr 1fr; gap:6px; max-height:620px; overflow:auto; padding:8px 4px 0 0; }}
+  .boss-card-grid {{ display:grid; grid-template-columns:repeat(auto-fill,minmax(236px,1fr)); gap:6px; max-height:620px; overflow:auto; padding:8px 4px 0 0; }}
   .boss-directory-card {{ min-height:82px; display:grid; grid-template-columns:64px minmax(0,1fr); gap:9px; padding:7px; border:1px solid #44371f; background:#0d0f0c; color:inherit; cursor:pointer; text-align:left; }}
   .boss-directory-card:hover,.boss-directory-card.active {{ border-color:var(--gold); background:#18150d; }}
   .boss-directory-card.active {{ box-shadow:inset 3px 0 0 var(--gold-bright); }}
