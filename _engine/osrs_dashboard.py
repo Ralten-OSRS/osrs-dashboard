@@ -5519,6 +5519,23 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   .page :is(.pulse-window-btn,.wealth-control,.luck-sort-controls button,.journey-controls button,.boss-category-tabs button,.boss-sort-row button,.filter-btn,.chron-filter-btn).active {{
     color:var(--gold-bright); border-color:var(--gold); background:#2a210d; box-shadow:none;
   }}
+
+  /* ── Loot Log: rows share the width ────────────────────────────────────
+     A ledger row is a thumbnail, a name, a date and a value, and in one
+     full-width column it used about a quarter of its line. On a wide screen
+     the rows sit in two columns, three on an ultrawide, reading left to
+     right and then down in the selected order. */
+  .loot-table-heads,.loot-rows {{ display:grid; grid-template-columns:1fr; column-gap:26px; }}
+  .loot-head-extra {{ display:none; }}
+  @media (min-width:1280px) {{
+    .loot-table-heads,.loot-rows {{ grid-template-columns:1fr 1fr; }}
+    .loot-table-head,.loot-row {{ grid-template-columns:minmax(200px,1fr) 96px 104px; }}
+    .loot-head-extra:nth-child(2) {{ display:grid; }}
+  }}
+  @media (min-width:1900px) {{
+    .loot-table-heads,.loot-rows {{ grid-template-columns:1fr 1fr 1fr; }}
+    .loot-head-extra:nth-child(3) {{ display:grid; }}
+  }}
 </style>
 </head>
 <body>
@@ -5817,7 +5834,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   </section>
   <section class="card loot-ledger">
     <div class="loot-ledger-head"><div><span>Screenshot-backed wealth evidence</span><h2>The Drops Behind the Number</h2><p>Pending assemblies stay out of this realized-value ledger.</p></div><div class="loot-sort-controls"><button class="filter-btn active" onclick="sortLoot('value', this)">Highest Value</button><button class="filter-btn" onclick="sortLoot('date', this)">Newest First</button></div></div>
-    <div class="loot-table-head"><span>Event</span><span>Captured</span><span>Realized value</span></div>
+    <div class="loot-table-heads"><div class="loot-table-head"><span>Event</span><span>Captured</span><span>Realized value</span></div><div class="loot-table-head loot-head-extra" aria-hidden="true"><span>Event</span><span>Captured</span><span>Realized value</span></div><div class="loot-table-head loot-head-extra" aria-hidden="true"><span>Event</span><span>Captured</span><span>Realized value</span></div></div>
     <div class="loot-rows" id="loot-grid"></div>
   </section>
 </div>
