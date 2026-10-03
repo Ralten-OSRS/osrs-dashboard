@@ -376,6 +376,13 @@ def update_xp_history(hiscores):
             "clues": dict(hiscores.get("clues", {})),
             "kc": dict(hiscores.get("bosses", {})),
         }
+        # Boss ranks ride along from the day they were first read. A rank
+        # moves even when the account does nothing, because other players
+        # keep killing, so the only way to ever show that movement is to
+        # have recorded it. Left out entirely when no ranks came back, so
+        # older snapshots and offline refreshes look the same to readers.
+        if hiscores.get("boss_ranks"):
+            entry["rank"] = dict(hiscores["boss_ranks"])
         if hiscores.get("collections_logged"):
             entry["clog"] = hiscores["collections_logged"]
         history = [h for h in history if h.get("date") != today]
@@ -669,7 +676,7 @@ def update_known_bosses(names):
 def parse_hiscores_payload(payload):
     """Turn the raw hiscores JSON into the result dict. Split out from
     fetch_hiscores so it can be tested without network access."""
-    result = {"skills": {}, "clues": {}, "bosses": {}, "boss_names": []}
+    result = {"skills": {}, "clues": {}, "bosses": {}, "boss_ranks": {}, "boss_names": []}
 
     skill_lookup = {s.lower(): s for s in HISCORES_SKILLS}
     for s in payload.get("skills", []):
@@ -703,6 +710,13 @@ def parse_hiscores_payload(payload):
         result["boss_names"].append(canonical_boss)
         if score is not None and score > 0:
             result["bosses"][canonical_boss] = int(score)
+            # The same entry carries the player's position on that boss's
+            # hiscores table. An unranked boss comes back as -1, and a rank
+            # is only meaningful next to the kill count it was earned with,
+            # so it is kept only for bosses that also have KC.
+            rank = a.get("rank", -1)
+            if isinstance(rank, (int, float)) and rank > 0:
+                result["boss_ranks"][canonical_boss] = int(rank)
 
     return result
 
@@ -2218,6 +2232,9 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
     hs_skills = hiscores.get("skills", {})
     hs_clues = hiscores.get("clues", {})
     hs_bosses = hiscores.get("bosses", {})
+    # Absent whenever the hiscores were unreachable or the caller predates
+    # ranks, so every reader below treats a missing rank as "not ranked".
+    hs_boss_ranks = hiscores.get("boss_ranks", {})
 
     def fmt_gp(v):
         if v >= 1_000_000_000:
@@ -2653,25 +2670,31 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
                       "Shared GWD Drops", "Shared Wilderness Drops"}
 
     def _sort_key(b):
-        return (0 if b in VIRTUAL_BOSSES else 1, -_content_count(b))
+        return (0 if b in VIRTUAL_BOSSES else 1, -_content_count(b), -hs_bosses.get(b, 0))
+
+    # The directory lists every boss the account has a kill count for, not
+    # only the ones with screenshots. A boss can hold the account's best
+    # hiscores rank and have no captured evidence at all, and a rank sort
+    # that could not show it would be answering a different question.
+    directory_bosses = bosses_with_content | set(hs_bosses)
 
     # Build the category-ordered list: walk BOSS_CATEGORIES in display order,
     # within each category sort bosses by content volume descending (virtuals
-    # always rank above real bosses). Anything with content but no category
-    # falls into "Other" at the bottom.
+    # always rank above real bosses), then by kill count. Anything listed but
+    # uncategorized falls into "Other" at the bottom.
     ordered_bosses = []
     seen = set()
     for cat_name, cat_bosses in BOSS_CATEGORIES:
         in_cat = sorted(
-            [b for b in cat_bosses if b in bosses_with_content],
+            [b for b in cat_bosses if b in directory_bosses],
             key=_sort_key,
         )
         for b in in_cat:
             ordered_bosses.append((b, cat_name))
             seen.add(b)
     leftovers = sorted(
-        [b for b in bosses_with_content if b not in seen],
-        key=lambda b: -_content_count(b)
+        [b for b in directory_bosses if b not in seen],
+        key=lambda b: (-_content_count(b), -hs_bosses.get(b, 0), b)
     )
     for b in leftovers:
         ordered_bosses.append((b, "Other"))
@@ -2696,6 +2719,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
             "boss": boss,
             "category": category,
             "kc": hs_bosses.get(boss, 0),
+            "rank": hs_boss_ranks.get(boss, 0),
             "gp": boss_gp_total.get(boss, 0),
             "gp_str": fmt_gp(boss_gp_total.get(boss, 0)) if boss_gp_total.get(boss, 0) else "",
             "representative": _boss_evidence[0]["src"] if _boss_evidence else "",
@@ -2856,9 +2880,15 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
     luck_card_label = f"Luck · {luck_verdict_str}" if luck_bosses else "Luck"
     # Top 16 roughly matches the 99s Timeline's height so the grid-2 row has
     # no dead column (whitespace was flagged with 8 rows, July 2026).
-    fav_bosses = sorted(hs_bosses.items(), key=lambda x: -x[1])[:16]
+    # Every boss with KC is handed to the page, kill count descending, and the
+    # widget shows 16 of them. It needs the whole list because the best-rank
+    # view is a different 16 from the highest-KC view.
+    fav_bosses = sorted(hs_bosses.items(), key=lambda x: (-x[1], x[0]))
     total_boss_kc = sum(hs_bosses.values())
-    fav_bosses_json = json.dumps([{"boss": _fb, "kc": _fk} for _fb, _fk in fav_bosses])
+    fav_bosses_json = json.dumps([
+        {"boss": _fb, "kc": _fk, "rank": hs_boss_ranks.get(_fb, 0)}
+        for _fb, _fk in fav_bosses
+    ])
 
     # Milestone HTML
     milestone_html = ""
@@ -5067,6 +5097,22 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   .home-legacy-grid {{ order:6; margin:0 !important; }}
   .home-scroll-card {{ min-height:0; padding:15px 16px !important; }}
   .home-scroll-card #nineties-timeline,.home-scroll-card #fav-bosses {{ max-height:340px; overflow:auto; padding-right:7px; }}
+  /* Bossing Record sort row. It only appears when the hiscores returned
+     ranks, and the list gives up exactly the height the row takes so the
+     card still ends level with the 99s Timeline beside it. The right-hand
+     padding is the list's own 7px plus its 10px scrollbar, which keeps the
+     column labels over the numbers they name. */
+  .fav-toolbar {{ display:flex; justify-content:space-between; align-items:flex-end; gap:10px; margin-bottom:8px; padding-right:17px; }}
+  .fav-toolbar[hidden] {{ display:none; }}
+  .fav-toolbar .luck-sort-controls {{ margin-top:0; }}
+  .fav-toolbar .luck-sort-controls button {{ height:26px; flex:none; }}
+  .fav-columns {{ display:flex; flex:none; gap:10px; color:#c8bfae; font:600 8px 'Cinzel',serif; letter-spacing:.6px; text-transform:uppercase; }}
+  .fav-columns span {{ text-align:right; }}
+  .fav-columns span:first-child {{ min-width:42px; }}
+  .fav-columns span:last-child,.fav-rank {{ min-width:58px; }}
+  .fav-rank {{ font-size:0.72rem; color:var(--text-dim); text-align:right; }}
+  .rtm-remaining.fav-sorted,.fav-rank.fav-sorted {{ color:var(--gold); }}
+  .home-scroll-card #fav-bosses.has-ranks {{ max-height:306px; scrollbar-gutter:stable; }}
   .home-activity-card {{ order:7; margin:0 !important; padding:15px 16px; }}
   .home-activity-card canvas {{ max-height:190px; }}
   .stats-story-row {{ order:8; margin:0 !important; }}
@@ -5142,6 +5188,14 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   .boss-directory-pane {{ min-width:0; }}
   .boss-controls {{ display:flex; gap:6px; }}
   .boss-controls input {{ width:180px; height:30px; padding:0 9px; border:1px solid var(--border-bright); background:#0d0e0b; color:var(--text); font:11px 'Segoe UI',Arial,sans-serif; }}
+  .boss-sort-row {{ display:flex; gap:5px; overflow:auto; padding-top:9px; }}
+  .boss-sort-row button {{ height:30px; padding:0 9px; flex:none; border:1px solid var(--border-bright); background:#0d0e0b; color:#c8bfae; cursor:pointer; font:600 8px 'Cinzel',serif; text-transform:uppercase; }}
+  .boss-sort-row button:hover,.boss-sort-row button.active {{ color:var(--gold-bright); border-color:var(--gold); background:#2a210d; }}
+  .boss-directory-card .boss-card-rank {{ color:var(--gold); }}
+  /* A boss listed from its kill count alone has no screenshot to show, so
+     its initials stand in. The generic card span rule below would otherwise
+     shrink them into the corner of the tile. */
+  .boss-directory-card .boss-card-monogram {{ display:grid; place-items:center; margin-top:0; color:var(--gold-bright); font:600 16px 'Cinzel',serif; }}
   .boss-card-grid {{ display:grid; grid-template-columns:1fr 1fr; gap:6px; max-height:620px; overflow:auto; padding:8px 4px 0 0; }}
   .boss-directory-card {{ min-height:82px; display:grid; grid-template-columns:64px minmax(0,1fr); gap:9px; padding:7px; border:1px solid #44371f; background:#0d0f0c; color:inherit; cursor:pointer; text-align:left; }}
   .boss-directory-card:hover,.boss-directory-card.active {{ border-color:var(--gold); background:#18150d; }}
@@ -5441,6 +5495,13 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
     </div>
     <div class="card home-scroll-card">
       <div class="home-section-head"><div><span>{f"{total_boss_kc:,} lifetime kills" if total_boss_kc else "Current hiscores"}</span><h2>Bossing Record</h2></div><button class="home-text-link" onclick="goToPage('bosses')">Boss directory →</button></div>
+      <div class="fav-toolbar" id="fav-toolbar" hidden>
+        <div class="luck-sort-controls" aria-label="Sort bosses">
+          <button class="active" data-fav-sort="kc" onclick="sortFavBosses('kc', this)">Highest KC</button>
+          <button data-fav-sort="rank" onclick="sortFavBosses('rank', this)">Best Rank</button>
+        </div>
+        <div class="fav-columns" aria-hidden="true"><span>Kills</span><span>Rank</span></div>
+      </div>
       <div id="fav-bosses"></div>
     </div>
   </div>
@@ -5553,7 +5614,12 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
     <div class="boss-category-tabs" id="boss-category-tabs"></div>
     <div class="boss-browser">
       <section class="boss-directory-pane">
-        <div class="boss-directory-head"><div><h2>Boss Directory</h2><p>Choose an encounter to inspect its captured story.</p></div><div class="boss-controls"><input id="boss-search" type="search" placeholder="Search bosses..."><button id="boss-sort" type="button" onclick="toggleBossSort(this)">Most evidence</button></div></div>
+        <div class="boss-directory-head"><div><h2>Boss Directory</h2><p>Choose an encounter to inspect its captured story.</p></div><div class="boss-controls"><input id="boss-search" type="search" placeholder="Search bosses..."></div></div>
+        <div class="boss-sort-row" aria-label="Sort bosses">
+          <button class="active" type="button" data-boss-sort="evidence" onclick="sortBosses('evidence', this)">Most evidence</button>
+          <button type="button" data-boss-sort="kc" onclick="sortBosses('kc', this)">Highest KC</button>
+          <button type="button" data-boss-sort="rank" id="boss-sort-rank" onclick="sortBosses('rank', this)" hidden>Best rank</button>
+        </div>
         <div class="boss-card-grid" id="boss-grid"></div>
       </section>
       <aside class="boss-detail-pane" id="boss-detail-panel" aria-live="polite"></aside>
@@ -6983,25 +7049,59 @@ renderAccountPulse();
 const ROAD_TO_MAX = {json.dumps(road_to_max_json)};
 const XP_TREND = {json.dumps(xp_trend)};
 
-// Favorite Bosses widget on the Stats page — lifetime KC from hiscores
+// Bossing Record widget on the Stats page: lifetime KC and hiscores rank.
+// FAV_BOSSES is every boss with KC, kill count descending; the widget shows
+// FAV_BOSS_ROWS of them in whichever order is selected.
 const FAV_BOSSES = {fav_bosses_json};
-(function() {{
+const FAV_BOSS_ROWS = 16;
+const FAV_HAS_RANKS = FAV_BOSSES.some(b => b.rank > 0);
+let favBossSort = 'kc';
+
+function sortFavBosses(mode, btn) {{
+  favBossSort = mode;
+  document.querySelectorAll('[data-fav-sort]').forEach(b => b.classList.toggle('active', b === btn));
+  renderFavBosses();
+}}
+
+function renderFavBosses() {{
   const container = document.getElementById('fav-bosses');
   if (!container) return;
   if (FAV_BOSSES.length === 0) {{
     container.innerHTML = '<p class="empty-note">Hiscores unreachable — boss KC unavailable this refresh.</p>';
     return;
   }}
+  // Bars stay scaled to the account's highest kill count in both orders, so
+  // switching to rank shows which high ranks were reached on few kills.
   const maxKc = FAV_BOSSES[0].kc || 1;
+  let rows = FAV_BOSSES.slice();
+  if (favBossSort === 'rank') {{
+    // Unranked bosses carry rank 0 and sink below every ranked one.
+    rows.sort((a, b) => ((a.rank || Infinity) - (b.rank || Infinity)) || (b.kc - a.kc));
+  }}
+  rows = rows.slice(0, FAV_BOSS_ROWS);
   let html = '';
-  FAV_BOSSES.forEach(b => {{
+  rows.forEach(b => {{
     html += '<div class="rtm-row">'
       + '<span class="fav-name">' + b.boss + '</span>'
       + '<div class="rtm-bar-bg"><div class="rtm-bar-fill" style="width:' + Math.round(b.kc / maxKc * 100) + '%;background:var(--gold-dim)"></div></div>'
-      + '<span class="rtm-remaining">' + b.kc.toLocaleString() + '</span>'
+      + '<span class="rtm-remaining' + (FAV_HAS_RANKS && favBossSort === 'kc' ? ' fav-sorted' : '') + '">' + b.kc.toLocaleString() + '</span>'
+      + (FAV_HAS_RANKS ? '<span class="fav-rank' + (favBossSort === 'rank' ? ' fav-sorted' : '') + '">' + (b.rank ? b.rank.toLocaleString() : '—') + '</span>' : '')
       + '</div>';
   }});
   container.innerHTML = html;
+  container.scrollTop = 0;
+}}
+
+(function() {{
+  const toolbar = document.getElementById('fav-toolbar');
+  const container = document.getElementById('fav-bosses');
+  // Without ranks the widget is the plain kill-count list it always was:
+  // no sort controls, no second column, nothing to explain.
+  if (toolbar && container && FAV_HAS_RANKS) {{
+    toolbar.hidden = false;
+    container.classList.add('has-ranks');
+  }}
+  renderFavBosses();
 }})();
 
 // Full detail rows on the Road to Max page
@@ -7454,11 +7554,18 @@ function renderBosses() {{
       renderBossDirectory();
     }});
     document.getElementById('boss-search').addEventListener('input', renderBossDirectory);
+    // The rank sort is only offered when at least one rank came back from
+    // the hiscores; an offline refresh keeps the two sorts it always had.
+    const rankSort = document.getElementById('boss-sort-rank');
+    if (rankSort) rankSort.hidden = !BOSS_DATA.some(b => b.rank > 0);
+    // The directory also lists bosses known only from their kill count, so
+    // the screenshot-backed total counts evidence rather than rows.
+    const storyBosses = BOSS_DATA.filter(b => b.evidence_count > 0).length;
     const totalEvidence = BOSS_DATA.reduce((sum, b) => sum + b.evidence_count, 0);
     const valuableBosses = BOSS_DATA.filter(b => b.drops.length).length;
     const capturedTasks = BOSS_DATA.reduce((sum, b) => sum + (b.ca_captured || 0), 0);
     document.getElementById('boss-summary').innerHTML = [
-      [BOSS_DATA.length, 'Boss stories', 'Screenshot-backed encounters'],
+      [storyBosses, 'Boss stories', 'Screenshot-backed encounters'],
       [totalEvidence, 'Evidence items', 'Drops, logs and achievements'],
       [valuableBosses, 'Valuable-drop bosses', 'Named routed evidence'],
       [capturedTasks, 'Combat tasks captured', 'Screenshots, not completion rate']
@@ -7467,10 +7574,21 @@ function renderBosses() {{
   renderBossDirectory();
 }}
 
-function toggleBossSort(btn) {{
-  bossSortMode = bossSortMode === 'evidence' ? 'kc' : 'evidence';
-  btn.textContent = bossSortMode === 'evidence' ? 'Most evidence' : 'Highest KC';
+function sortBosses(mode, btn) {{
+  bossSortMode = mode;
+  document.querySelectorAll('[data-boss-sort]').forEach(item => item.classList.toggle('active', item === btn));
   renderBossDirectory();
+}}
+
+// Each sort falls through to the next most useful order on a tie. Rank is
+// ascending because 1 is the top of the table; a boss with no rank is stored
+// as 0 and compared as Infinity so it sorts after every ranked boss.
+function compareBosses(a, b) {{
+  const byEvidence = b.evidence_count - a.evidence_count;
+  const byKc = b.kc - a.kc;
+  if (bossSortMode === 'rank') return ((a.rank || Infinity) - (b.rank || Infinity)) || byKc || byEvidence;
+  if (bossSortMode === 'kc') return byKc || byEvidence;
+  return byEvidence || byKc;
 }}
 
 function renderBossDirectory() {{
@@ -7481,7 +7599,7 @@ function renderBossDirectory() {{
   }}
   const search = document.getElementById('boss-search').value.trim().toLowerCase();
   let rows = BOSS_DATA.map((boss, index) => ({{boss, index}})).filter(item => (bossCategory === 'All' || item.boss.category === bossCategory) && (!search || item.boss.boss.toLowerCase().includes(search)));
-  rows.sort((a, b) => bossSortMode === 'kc' ? (b.boss.kc - a.boss.kc) || (b.boss.evidence_count - a.boss.evidence_count) : (b.boss.evidence_count - a.boss.evidence_count) || (b.boss.kc - a.boss.kc));
+  rows.sort((a, b) => compareBosses(a.boss, b.boss));
   if (!rows.length) {{ grid.innerHTML = '<p class="empty-note">No bosses match this view.</p>'; return; }}
   if (!rows.some(item => item.index === selectedBossIndex)) selectedBossIndex = rows[0].index;
   grid.innerHTML = rows.map(item => {{
@@ -7489,7 +7607,9 @@ function renderBossDirectory() {{
     const initials = b.boss.split(/\s+/).map(word => word[0]).join('').slice(0, 2);
     const visual = b.representative ? '<img src="' + b.representative + '" alt="" loading="lazy">' : '<span class="boss-card-monogram">' + initials + '</span>';
     return '<button class="boss-directory-card ' + (item.index === selectedBossIndex ? 'active' : '') + '" data-boss-index="' + item.index + '" onclick="selectBoss(' + item.index + ')">' + visual
-      + '<span><strong>' + b.boss + '</strong><span>' + b.category + (b.kc ? ' · ' + b.kc.toLocaleString() + ' KC' : '') + '</span><small>' + b.evidence_count + ' evidence item' + (b.evidence_count === 1 ? '' : 's') + (b.gp_str ? ' · ' + b.gp_str + ' logged' : '') + '</small></span></button>';
+      + '<span><strong>' + b.boss + '</strong><span>' + b.category + (b.kc ? ' · ' + b.kc.toLocaleString() + ' KC' : '') + '</span>'
+      + (b.rank ? '<span class="boss-card-rank">Hiscores rank ' + b.rank.toLocaleString() + '</span>' : '')
+      + '<small>' + (b.evidence_count ? b.evidence_count + ' evidence item' + (b.evidence_count === 1 ? '' : 's') : 'No screenshots yet') + (b.gp_str ? ' · ' + b.gp_str + ' logged' : '') + '</small></span></button>';
   }}).join('');
   selectBoss(selectedBossIndex, false);
 }}
@@ -7514,7 +7634,7 @@ function selectBoss(idx, rerender = true) {{
   const initials = b.boss.split(/\s+/).map(word => word[0]).join('').slice(0, 2);
   const representativeIndex = Math.max(0, BOSS_SHOT_ITEMS.findIndex(item => item.src === b.representative));
   const visual = b.representative ? '<button class="boss-hero-shot" onclick="openBossIdx(' + representativeIndex + ')" aria-label="Open ' + b.boss + ' screenshots"><img src="' + b.representative + '" alt=""></button>' : '<div class="boss-detail-monogram">' + initials + '</div>';
-  document.getElementById('boss-detail-panel').innerHTML = '<div class="boss-detail-hero-new">' + visual + '<div><h2>' + b.boss + '</h2><p>' + (b.kc ? b.kc.toLocaleString() + ' tracked kills' : 'KC unavailable') + ' · ' + b.category + '</p><p>' + (b.gp_str ? b.gp_str + ' realized value logged' : 'No realized GP attributed') + '</p></div></div>'
+  document.getElementById('boss-detail-panel').innerHTML = '<div class="boss-detail-hero-new">' + visual + '<div><h2>' + b.boss + '</h2><p>' + (b.kc ? b.kc.toLocaleString() + ' tracked kills' : 'KC unavailable') + (b.rank ? ' · Hiscores rank ' + b.rank.toLocaleString() : '') + ' · ' + b.category + '</p><p>' + (b.gp_str ? b.gp_str + ' realized value logged' : 'No realized GP attributed') + '</p></div></div>'
     + '<div class="boss-evidence-stats"><div><strong>' + b.evidence_count + '</strong><span>Evidence items</span></div><div><strong>' + b.drops.length + '</strong><span>Valuable drops</span></div><div><strong>' + (b.ca_captured || 0) + (b.ca_total ? ' / ' + b.ca_total : '') + '</strong><span>CA screenshots / Wiki tasks</span></div></div>'
     + (evidenceHtml || '<p class="empty-note">No screenshots captured for this boss yet.</p>');
 }}

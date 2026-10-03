@@ -13,7 +13,7 @@ Seven pages, all built from your own data:
 - **Stats** is the account cover: current levels, total level, and where the account stands right now.
 - **Maxing Journey** tracks progress toward 99s, with XP-per-day pacing and estimated time remaining once it has a few days of history.
 - **Luck** compares your drops against published rates, linked back to the screenshot that proves each one.
-- **Bosses** covers kill counts and drop tables for every boss it finds on your hiscores.
+- **Bosses** covers kill counts, hiscores ranks, and drop tables for every boss it finds on your hiscores.
 - **Loot Log** is the running record of valuable drops, with thumbnails you can open.
 - **Gallery** is every screenshot, filterable, with hearts for saving Favorite Memories.
 - **Chronicle** is the historical timeline, told through the screenshots themselves.
@@ -88,7 +88,7 @@ Wealth tracking only counts items with clear evidence and a resolvable price. In
 
 **Charts are empty.** Your hiscores couldn't be reached, either because the name isn't on the hiscores yet or the network is down. Everything built from screenshots still works.
 
-**Bosses I've killed aren't showing up.** RuneLite only saves screenshots for valuable drops, untradeables, collection log entries, and combat achievements, and only with the relevant plugin settings enabled. Anything it never screenshotted can't appear.
+**Bosses I've killed aren't showing up.** Every boss the hiscores report for you is listed with its kill count and rank. Its drops and achievements come from screenshots, and RuneLite only saves screenshots for valuable drops, untradeables, collection log entries, and combat achievements, and only with the relevant plugin settings enabled. Anything it never screenshotted can't appear.
 
 **Wealth says prices are unavailable.** The public price feed couldn't be reached and there's no saved quote yet. Nothing is lost; refresh again later and the value resolves.
 
