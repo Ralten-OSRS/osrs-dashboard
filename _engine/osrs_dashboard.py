@@ -3700,7 +3700,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   .header-title p {{
     font-family: 'Cinzel', serif;
     color: var(--text-muted);
-    font-size: 0.72rem;
+    font-size: 0.8rem;
     letter-spacing: 2px;
     margin-top: 6px;
     text-transform: uppercase;
@@ -3737,13 +3737,13 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
     color: var(--gold);
     padding: 8px 14px;
     font-family: 'Cinzel', serif;
-    font-size: 0.68rem;
+    font-size: 0.75rem;
     letter-spacing: 0.8px;
     cursor: pointer;
   }}
   .refresh-btn:hover {{ border-color: var(--gold); color: var(--gold-bright); }}
   .refresh-btn:disabled {{ cursor: wait; opacity: 0.65; }}
-  .app-status {{ color: #b3a17e; font-size: 0.74rem; text-align: center; max-width: 260px; }}
+  .app-status {{ color: #b3a17e; font-size: 0.8rem; text-align: center; max-width: 260px; }}
   .app-status:empty {{ display: none; }}
 
   /* PAGES */
@@ -3786,7 +3786,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   }}
   .stat-card .label {{
     font-family: 'Cinzel', serif;
-    font-size: 0.7rem;
+    font-size: 0.8rem;
     font-weight: 600;
     color: #c8bfae;
     margin-top: 8px;
@@ -3806,7 +3806,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   .pulse-kicker {{
     font-family: 'Cinzel', serif;
     color: #c8bfae;
-    font-size: 0.72rem;
+    font-size: 0.8rem;
     font-weight: 600;
     letter-spacing: 1.7px;
     text-transform: uppercase;
@@ -3825,7 +3825,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
     border: 1px solid var(--border-bright);
     color: #c8bfae;
     font-family: 'Cinzel', serif;
-    font-size: 0.7rem;
+    font-size: 0.8rem;
     font-weight: 600;
     letter-spacing: 0.9px;
     padding: 7px 12px;
@@ -3860,7 +3860,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   .pulse-panel-title {{
     font-family: 'Cinzel', serif;
     color: #e3d8c2;
-    font-size: 0.74rem;
+    font-size: 0.8rem;
     font-weight: 600;
     letter-spacing: 1.4px;
     text-transform: uppercase;
@@ -3894,7 +3894,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   }}
   .card h2 {{
     font-family: 'Cinzel', serif;
-    font-size: 0.72rem;
+    font-size: 0.8rem;
     text-transform: uppercase;
     letter-spacing: 2px;
     color: var(--gold);
@@ -3918,7 +3918,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   .wealth-tip .wt-more {{ color: var(--text-muted); margin-top: 4px; }}
   .wealth-tip .wt-open {{ color: var(--text-muted); font-style: italic; margin-top: 6px; }}
   .wealth-unresolved {{ margin-top: 12px; font-size: 0.76rem; color: #c8bfae; }}
-  .wealth-unresolved summary {{ cursor: pointer; color: var(--text-muted); font-family: 'Cinzel', serif; font-size: 0.66rem; letter-spacing: 0.8px; }}
+  .wealth-unresolved summary {{ cursor: pointer; color: var(--text-muted); font-family: 'Cinzel', serif; font-size: 0.75rem; letter-spacing: 0.8px; }}
   .wealth-unresolved summary:hover {{ color: var(--gold); }}
   .wealth-unresolved ul {{ margin: 8px 0 0; padding-left: 18px; line-height: 1.6; }}
   .wealth-unresolved li span {{ color: var(--text-muted); }}
@@ -3926,19 +3926,19 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   .wealth-summary {{ color: var(--text-muted); font-size: 0.8rem; line-height: 1.55; }}
   .wealth-summary b {{ color: var(--gold-bright); font-family: 'Cinzel', serif; font-weight: 600; }}
   .wealth-controls {{ display: flex; gap: 7px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }}
-  .wealth-control {{ background: #0d0a06; border: 1px solid var(--border-bright); color: #d8cdb8; padding: 6px 9px; font-family: 'Cinzel', serif; font-size: 0.68rem; font-weight: 600; letter-spacing: 0.6px; cursor: pointer; }}
+  .wealth-control {{ background: #0d0a06; border: 1px solid var(--border-bright); color: #d8cdb8; padding: 6px 9px; font-family: 'Cinzel', serif; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.6px; cursor: pointer; }}
   .wealth-control:hover {{ border-color: var(--gold-dim); color: var(--gold); }}
   .wealth-control.active {{ color: var(--gold); border-color: var(--gold); background: #2a1e08; }}
   .wealth-chart-wrap {{ height: 285px; position: relative; }}
   .wealth-gain-wrap {{ height: 108px; position: relative; margin-top: 14px; border-top: 1px solid var(--border); padding-top: 12px; }}
   .wealth-chart-note {{ color: #c8bfae; font-size: 0.76rem; margin: 10px 0 0; }}
   .wealth-pending {{ margin-top: 20px; border-top: 1px solid var(--border); padding-top: 14px; }}
-  .wealth-pending-label {{ font-family: 'Cinzel', serif; color: var(--text-muted); font-size: 0.65rem; letter-spacing: 1.2px; text-transform: uppercase; margin-bottom: 8px; }}
+  .wealth-pending-label {{ font-family: 'Cinzel', serif; color: var(--text-muted); font-size: 0.75rem; letter-spacing: 1.2px; text-transform: uppercase; margin-bottom: 8px; }}
   .wealth-pending-row {{ display: flex; justify-content: space-between; gap: 18px; padding: 10px 0; border-bottom: 1px solid var(--border); }}
   .wealth-pending-row:last-child {{ border-bottom: none; }}
   .wealth-pending-title {{ color: var(--text); font-size: 0.9rem; }}
-  .wealth-pending-parts {{ color: #c8bfae; font-size: 0.74rem; margin-top: 4px; }}
-  .wealth-pending-meta {{ color: var(--text-muted); font-size: 0.74rem; text-align: right; white-space: nowrap; }}
+  .wealth-pending-parts {{ color: #c8bfae; font-size: 0.8rem; margin-top: 4px; }}
+  .wealth-pending-meta {{ color: var(--text-muted); font-size: 0.8rem; text-align: right; white-space: nowrap; }}
   .wealth-pending-meta span {{ display: block; color: var(--gold); margin-top: 4px; }}
   .wealth-empty {{ color: #c8bfae; font-size: 0.84rem; font-style: italic; margin: 0; }}
   .wealth-catalog-note {{ color: #c8bfae; font-size: 0.76rem; line-height: 1.45; margin: 12px 0 0; }}
@@ -3960,7 +3960,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   .milestone-item:last-child {{ border-bottom: none; }}
   .milestone-badge {{
     font-family: 'Cinzel', serif;
-    font-size: 0.68rem;
+    font-size: 0.75rem;
     font-weight: 700;
     color: #000;
     border-radius: 2px;
@@ -3998,7 +3998,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
     display: block;
   }}
   .pet-thumb-date {{
-    font-size: 0.62rem;
+    font-size: 0.75rem;
     color: var(--text-dim);
     text-align: center;
     padding: 4px 2px;
@@ -4009,7 +4009,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
 
   /* CLUES */
   .clue-inline-row {{ font-size: 0.88rem; color: var(--text); line-height: 1.8; }}
-  .clue-inline-tier {{ font-family: 'Cinzel', serif; font-size: 0.75rem; letter-spacing: 0.5px; }}
+  .clue-inline-tier {{ font-family: 'Cinzel', serif; font-size: 0.8rem; letter-spacing: 0.5px; }}
   .clue-inline-count {{ font-weight: 700; color: var(--gold); margin-left: 4px; }}
   .clue-inline-sep {{ color: var(--text-dim); }}
 
@@ -4039,7 +4039,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
     border: 1px solid var(--border);
     color: var(--text-muted);
     padding: 6px 14px;
-    font-size: 0.72rem;
+    font-size: 0.8rem;
     font-family: 'Cinzel', serif;
     letter-spacing: 0.5px;
     cursor: pointer;
@@ -4072,7 +4072,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   .gallery-item .thumb-info {{ padding: 8px 10px; }}
   .gallery-item .thumb-cat {{
     font-family: 'Cinzel', serif;
-    font-size: 0.62rem;
+    font-size: 0.75rem;
     color: var(--gold);
     text-transform: uppercase;
     letter-spacing: 0.8px;
@@ -4086,7 +4086,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
     text-overflow: ellipsis;
   }}
   .gallery-item .thumb-date {{
-    font-size: 0.72rem;
+    font-size: 0.8rem;
     color: var(--text-dim);
     margin-top: 2px;
   }}
@@ -4097,7 +4097,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
     color: var(--gold);
     padding: 9px 20px;
     font-family: 'Cinzel', serif;
-    font-size: 0.72rem;
+    font-size: 0.8rem;
     letter-spacing: 0.8px;
     cursor: pointer;
   }}
@@ -4195,7 +4195,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   .drop-top-row:last-child {{ border-bottom: none; }}
   .drop-rank {{ font-family: 'Cinzel', serif; font-size: 0.78rem; font-weight: 700; color: var(--gold); min-width: 28px; }}
   .drop-name {{ flex: 1; font-size: 1rem; color: var(--text); }}
-  .drop-kind {{ color: #c8bfae; font-family: 'Cinzel', serif; font-size: 0.62rem; font-weight: 600; letter-spacing: 0.7px; text-transform: uppercase; white-space: nowrap; }}
+  .drop-kind {{ color: #c8bfae; font-family: 'Cinzel', serif; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.7px; text-transform: uppercase; white-space: nowrap; }}
   .drop-value {{ font-size: 0.95rem; font-weight: 700; color: var(--gold-bright); min-width: 60px; text-align: right; font-family: 'Cinzel', serif; }}
   .drop-date {{ font-size: 0.78rem; color: var(--text-dim); min-width: 90px; text-align: right; }}
 
@@ -4223,7 +4223,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   .loot-card .loot-info {{ padding: 10px 12px; }}
   .loot-card .loot-item {{ font-size: 1rem; color: var(--text); font-weight: 600; }}
   .loot-card .loot-gp {{ font-family: 'Cinzel', serif; font-size: 0.85rem; color: var(--gold-bright); font-weight: 700; margin-top: 4px; }}
-  .loot-card .loot-date {{ font-size: 0.75rem; color: var(--text-dim); margin-top: 3px; }}
+  .loot-card .loot-date {{ font-size: 0.8rem; color: var(--text-dim); margin-top: 3px; }}
   .loot-sort-controls {{ display: flex; gap: 8px; margin-bottom: 16px; }}
 
   /* HALL OF FAME */
@@ -4243,7 +4243,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   .hof-label {{ font-family: 'Cinzel', serif; font-size: 0.82rem; font-weight: 700; color: var(--gold); letter-spacing: 0.5px; }}
   .hof-note {{ color: #c8bfae; font-size: 0.8rem; margin: -5px 0 14px; }}
   .hof-source {{ font-size: 0.82rem; color: var(--text-muted); margin-top: 5px; }}
-  .hof-date {{ font-family: 'Cinzel', serif; font-size: 0.7rem; color: var(--text-dim); margin-top: 8px; letter-spacing: 0.5px; }}
+  .hof-date {{ font-family: 'Cinzel', serif; font-size: 0.8rem; color: var(--text-dim); margin-top: 8px; letter-spacing: 0.5px; }}
 
   /* 99s TIMELINE */
   #nineties-timeline {{
@@ -4279,7 +4279,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
     box-shadow: 0 0 0 1px rgba(255,255,255,0.1);
   }}
   .nt-skill {{ font-size: 0.88rem; color: var(--text); min-width: 110px; }}
-  .nt-date {{ font-family: 'Cinzel', serif; font-size: 0.72rem; color: var(--text-dim); letter-spacing: 0.5px; }}
+  .nt-date {{ font-family: 'Cinzel', serif; font-size: 0.8rem; color: var(--text-dim); letter-spacing: 0.5px; }}
   .nt-empty {{ color: var(--text-dim); font-size: 0.85rem; padding: 12px 0; }}
 
   /* ROAD TO MAX */
@@ -4302,7 +4302,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
     transition: width 0.4s ease;
   }}
   .rtm-level {{ font-family: 'Cinzel', serif; font-size: 0.78rem; color: var(--gold); min-width: 28px; text-align: right; }}
-  .rtm-remaining {{ font-size: 0.72rem; color: var(--text-dim); min-width: 42px; text-align: right; }}
+  .rtm-remaining {{ font-size: 0.8rem; color: var(--text-dim); min-width: 42px; text-align: right; }}
 
   /* ROAD TO MAX TAB */
   .rtm-pace-note {{ font-size: 0.78rem; color: var(--text-dim); margin: -8px 0 20px 2px; }}
@@ -4316,8 +4316,8 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   .rtm-skill-lg {{ font-family: 'Cinzel', serif; font-size: 1rem; font-weight: 700; }}
   .rtm-detail-level {{ margin-left: auto; font-family: 'Cinzel', serif; font-size: 0.85rem; color: var(--gold); }}
   .rtm-bar-lg {{ height: 10px; }}
-  .rtm-detail-meta {{ display: flex; justify-content: space-between; gap: 12px; font-size: 0.75rem; color: var(--text-dim); margin-top: 6px; }}
-  .rtm-badge {{ font-size: 0.62rem; font-weight: 700; padding: 2px 8px; border: 1px solid var(--border); text-transform: uppercase; letter-spacing: 1px; }}
+  .rtm-detail-meta {{ display: flex; justify-content: space-between; gap: 12px; font-size: 0.8rem; color: var(--text-dim); margin-top: 6px; }}
+  .rtm-badge {{ font-size: 0.75rem; font-weight: 700; padding: 2px 8px; border: 1px solid var(--border); text-transform: uppercase; letter-spacing: 1px; }}
   .rtm-badge-active {{ color: #2ecc71; border-color: #2ecc71; }}
 
   /* LUCK TAB */
@@ -4325,13 +4325,13 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   #page-luck > * {{ margin-bottom: 0 !important; }}
   .luck-summary-grid {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }}
   .luck-summary-card {{ min-height: 86px; padding: 12px 14px; display: grid; grid-template-columns: 42px minmax(0,1fr); gap: 11px; align-items: center; background: linear-gradient(145deg,#17170f,#10110e); border: 1px solid #45371d; }}
-  .luck-orbit {{ width: 40px; height: 40px; display: grid; place-items: center; border: 1px solid var(--gold-dim); border-radius: 50%; box-shadow: inset 0 0 0 4px #111007; color: var(--gold-bright); font: 600 9px 'Cinzel',serif; }}
+  .luck-orbit {{ width: 40px; height: 40px; display: grid; place-items: center; border: 1px solid var(--gold-dim); border-radius: 50%; box-shadow: inset 0 0 0 4px #111007; color: var(--gold-bright); font: 600 11px 'Cinzel',serif; }}
   .luck-summary-card strong,.luck-summary-card span,.luck-summary-card small {{ display: block; }}
   .luck-summary-card strong {{ color: var(--gold-bright); font: 600 1.35rem 'Cinzel',serif; line-height: 1; }}
-  .luck-summary-card span {{ margin-top: 5px; color: var(--text); font: 600 .61rem 'Cinzel',serif; letter-spacing: .6px; text-transform: uppercase; }}
-  .luck-summary-card small {{ margin-top: 3px; color: #c8bfae; font-size: .69rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
+  .luck-summary-card span {{ margin-top: 5px; color: var(--text); font: 600 0.75rem 'Cinzel',serif; letter-spacing: .6px; text-transform: uppercase; }}
+  .luck-summary-card small {{ margin-top: 3px; color: #c8bfae; font-size: 0.8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
   .luck-methodology {{ padding: 0 14px; background: linear-gradient(145deg,#15140e,#0f100d); border: 1px solid #45371d; }}
-  .luck-methodology summary {{ padding: 10px 0; width: fit-content; cursor: pointer; color: var(--gold-bright); font: 600 .66rem 'Cinzel',serif; letter-spacing: .7px; text-transform: uppercase; }}
+  .luck-methodology summary {{ padding: 10px 0; width: fit-content; cursor: pointer; color: var(--gold-bright); font: 600 0.75rem 'Cinzel',serif; letter-spacing: .7px; text-transform: uppercase; }}
   .luck-methodology summary:hover {{ color: var(--gold); }}
   .luck-methodology p {{ margin: 0; padding: 10px 0 12px; border-top: 1px solid #49391c; color: #c8bfae; font-size: .78rem; line-height: 1.5; }}
   .luck-workspace {{ padding: 14px 16px; }}
@@ -4340,29 +4340,29 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   .luck-workspace-head p {{ margin: 4px 0 0; color: #c8bfae; font-size: .76rem; }}
   .luck-sort-controls {{ display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }}
   .luck-sort-controls::-webkit-scrollbar {{ display: none; }}
-  .luck-sort-controls button {{ height: 31px; padding: 0 10px; flex: none; border: 1px solid var(--border-bright); background: #0d0e0b; color: #c8bfae; cursor: pointer; font: 600 .58rem 'Cinzel',serif; letter-spacing: .45px; text-transform: uppercase; }}
+  .luck-sort-controls button {{ height: 31px; padding: 0 10px; flex: none; border: 1px solid var(--border-bright); background: #0d0e0b; color: #c8bfae; cursor: pointer; font: 600 0.75rem 'Cinzel',serif; letter-spacing: .45px; text-transform: uppercase; }}
   .luck-sort-controls button:hover {{ color: var(--gold); border-color: var(--gold-dim); }}
   .luck-sort-controls button.active {{ color: var(--gold-bright); background: #2a210d; border-color: var(--gold); }}
   .luck-browser {{ display: grid; grid-template-columns: minmax(390px,.9fr) minmax(420px,1.1fr); gap: 14px; padding-top: 12px; }}
   .luck-list-panel {{ min-width: 0; }}
   .luck-list-key {{ display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 7px; padding: 0 2px; }}
-  .luck-list-key strong {{ color: var(--gold-bright); font: 600 .64rem 'Cinzel',serif; letter-spacing: .65px; text-transform: uppercase; }}
-  .luck-list-key span {{ color: #c8bfae; font-size: .69rem; }}
+  .luck-list-key strong {{ color: var(--gold-bright); font: 600 0.75rem 'Cinzel',serif; letter-spacing: .65px; text-transform: uppercase; }}
+  .luck-list-key span {{ color: #c8bfae; font-size: 0.8rem; }}
   .luck-list {{ display: grid; gap: 6px; align-content: start; max-height: 612px; overflow-y: auto; padding-right: 4px; }}
   .luck-row {{ display: grid; grid-template-columns: 46px minmax(0,1fr) 104px; gap: 9px; align-items: center; min-height: 66px; padding: 8px; border: 1px solid #44371f; background: #0d0f0c; color: inherit; cursor: pointer; text-align: left; font-family: inherit; }}
   .luck-row:hover,.luck-row:focus-visible,.luck-row.active {{ border-color: var(--gold); background: #18150d; outline: none; }}
   .luck-row.active {{ box-shadow: inset 3px 0 0 var(--gold-bright); }}
   .luck-score {{ width: 41px; height: 41px; display: grid; place-items: center; border: 1px solid var(--score-color); border-radius: 50%; background: #11120e; color: var(--score-color); font: 600 .79rem 'Cinzel',serif; }}
   .luck-row-copy strong,.luck-row-copy span {{ display: block; }}
-  .luck-row-copy strong {{ color: var(--text); font: 600 .72rem 'Cinzel',serif; }}
-  .luck-row-copy span {{ margin-top: 3px; color: #c8bfae; font-size: .67rem; }}
+  .luck-row-copy strong {{ color: var(--text); font: 600 0.8rem 'Cinzel',serif; }}
+  .luck-row-copy span {{ margin-top: 3px; color: #c8bfae; font-size: 0.75rem; }}
   .luck-row-meter {{ height: 5px; margin-top: 6px; overflow: hidden; background: #2d2a20; }}
   .luck-row-meter i {{ display: block; height: 100%; width: var(--score); background: var(--score-color); }}
   .luck-row-numbers {{ text-align: right; }}
   .luck-row-numbers strong,.luck-row-numbers span {{ display: block; }}
-  .luck-row-numbers strong {{ color: var(--gold-bright); font: 600 .68rem 'Cinzel',serif; }}
-  .luck-row-numbers span {{ margin-top: 3px; color: #c8bfae; font-size: .61rem; }}
-  .luck-gap {{ display: inline-block; margin-top: 5px; padding: 2px 5px; border: 1px solid #72533d; color: #d7ae90; font: 600 .5rem 'Cinzel',serif; text-transform: uppercase; }}
+  .luck-row-numbers strong {{ color: var(--gold-bright); font: 600 0.75rem 'Cinzel',serif; }}
+  .luck-row-numbers span {{ margin-top: 3px; color: #c8bfae; font-size: 0.75rem; }}
+  .luck-gap {{ display: inline-block; margin-top: 5px; padding: 2px 5px; border: 1px solid #72533d; color: #d7ae90; font: 600 0.75rem 'Cinzel',serif; text-transform: uppercase; }}
   .luck-detail {{ min-width: 0; padding-left: 14px; border-left: 1px solid #49391c; }}
   .luck-detail-hero {{ display: grid; grid-template-columns: 92px minmax(0,1fr); gap: 13px; min-height: 92px; padding-bottom: 11px; border-bottom: 1px solid #49391c; }}
   .luck-detail-visual {{ width: 92px; height: 92px; display: grid; place-items: center; border: 1px solid var(--gold-dim); background: radial-gradient(circle,#28200e,#0b0c0a); color: var(--gold-bright); font: 600 1.45rem 'Cinzel',serif; }}
@@ -4370,16 +4370,16 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   .luck-detail-image img {{ width:100%; height:100%; object-fit:cover; display:block; }}
   .luck-detail-image:hover,.luck-detail-image:focus-visible {{ border-color:var(--gold-bright); outline:none; }}
   .luck-detail-copy h2 {{ margin: 0; padding: 0; border: 0; color: var(--text); font-size: 1.05rem; }}
-  .luck-detail-copy p {{ margin: 5px 0 0; color: #c8bfae; font-size: .72rem; line-height: 1.45; }}
-  .luck-verdict {{ display: inline-block; margin-top: 8px; padding: 3px 7px; border: 1px solid var(--score-color); color: var(--score-color); font: 600 .56rem 'Cinzel',serif; letter-spacing: .55px; text-transform: uppercase; }}
+  .luck-detail-copy p {{ margin: 5px 0 0; color: #c8bfae; font-size: 0.8rem; line-height: 1.45; }}
+  .luck-verdict {{ display: inline-block; margin-top: 8px; padding: 3px 7px; border: 1px solid var(--score-color); color: var(--score-color); font: 600 0.75rem 'Cinzel',serif; letter-spacing: .55px; text-transform: uppercase; }}
   .luck-equation {{ display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px; align-items: center; margin: 11px 0; padding: 10px; border: 1px solid #44371f; background: #0d0e0b; text-align: center; }}
   .luck-equation strong,.luck-equation span {{ display: block; }}
   .luck-equation strong {{ color: var(--gold-bright); font: 600 1.05rem 'Cinzel',serif; }}
-  .luck-equation span {{ margin-top: 3px; color: #c8bfae; font-size: .62rem; }}
-  .luck-equation i {{ color: var(--text-dim); font-size: .65rem; font-style: normal; text-transform: uppercase; }}
+  .luck-equation span {{ margin-top: 3px; color: #c8bfae; font-size: 0.75rem; }}
+  .luck-equation i {{ color: var(--text-dim); font-size: 0.75rem; font-style: normal; text-transform: uppercase; }}
   .luck-detail-section header {{ position: static; height: auto; margin: 0 0 8px; padding: 0; display: flex; align-items: baseline; justify-content: space-between; gap: 10px; background: none; border: 0; box-shadow: none; }}
-  .luck-detail-section header strong {{ color: var(--text); font: 600 .66rem 'Cinzel',serif; letter-spacing: .5px; text-transform: uppercase; }}
-  .luck-detail-section header span {{ color: #c8bfae; font-size: .66rem; }}
+  .luck-detail-section header strong {{ color: var(--text); font: 600 0.75rem 'Cinzel',serif; letter-spacing: .5px; text-transform: uppercase; }}
+  .luck-detail-section header span {{ color: #c8bfae; font-size: 0.75rem; }}
   .luck-item-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }}
   .luck-item {{ min-width: 0; padding: 8px 9px; border: 1px solid #44371f; background: #0d0f0c; }}
   .luck-item.owned {{ border-color: #78601f; background: #17150b; }}
@@ -4387,11 +4387,11 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   .luck-item.evidence-linked {{ cursor:pointer; position:relative; }}
   .luck-item.evidence-linked:hover,.luck-item.evidence-linked:focus-visible {{ border-color:var(--gold-bright); background:#211b0c; outline:none; box-shadow:inset 3px 0 0 var(--gold-bright); }}
   .luck-item strong,.luck-item span,.luck-item small {{ display: block; overflow: hidden; text-overflow: ellipsis; }}
-  .luck-item strong {{ color: var(--text); font-size: .72rem; white-space: nowrap; }}
+  .luck-item strong {{ color: var(--text); font-size: 0.8rem; white-space: nowrap; }}
   .luck-item.owned strong {{ color: var(--gold-bright); }}
-  .luck-item span {{ margin-top: 3px; color: #c8bfae; font-size: .62rem; }}
-  .luck-item small {{ margin-top: 4px; color: var(--text-dim); font-size: .61rem; white-space: nowrap; }}
-  .luck-gap-note {{ margin: 10px 0 0; padding: 9px; border: 1px solid #694b36; background: #18110d; color: #d7ae90; font-size: .69rem; line-height: 1.4; }}
+  .luck-item span {{ margin-top: 3px; color: #c8bfae; font-size: 0.75rem; }}
+  .luck-item small {{ margin-top: 4px; color: var(--text-dim); font-size: 0.75rem; white-space: nowrap; }}
+  .luck-gap-note {{ margin: 10px 0 0; padding: 9px; border: 1px solid #694b36; background: #18110d; color: #d7ae90; font-size: 0.8rem; line-height: 1.4; }}
   /* Crimson Text loses definition at microcopy sizes in Chromium. Keep the
      display typefaces for hierarchy, but render small supporting labels in
      the local UI font so they remain crisp at every browser scale. */
@@ -4412,9 +4412,9 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }}
-  .luck-equation span {{ color: #d8cdb8; font-size: .7rem; }}
-  .luck-equation i {{ font-size: .68rem; }}
-  .luck-row-numbers span,.luck-item span,.luck-item small {{ font-size: .66rem; }}
+  .luck-equation span {{ color: #d8cdb8; font-size: 0.8rem; }}
+  .luck-equation i {{ font-size: 0.75rem; }}
+  .luck-row-numbers span,.luck-item span,.luck-item small {{ font-size: 0.75rem; }}
   @media (max-width: 1180px) {{
     .luck-summary-grid {{ grid-template-columns: 1fr 1fr; }}
     .luck-browser {{ grid-template-columns: minmax(340px,.85fr) minmax(360px,1.15fr); }}
@@ -4429,11 +4429,11 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   @media (max-width: 600px) {{
     .luck-summary-grid {{ gap: 7px; }}
     .luck-summary-card {{ min-height: 74px; padding: 9px; grid-template-columns: 32px minmax(0,1fr); gap: 8px; }}
-    .luck-orbit {{ width: 30px; height: 30px; font-size: .45rem; }}
+    .luck-orbit {{ width: 30px; height: 30px; font-size: 0.75rem; }}
     .luck-summary-card strong {{ font-size: 1rem; }}
     .luck-sort-controls button {{ flex: 1; }}
     .luck-row {{ grid-template-columns: 40px minmax(0,1fr) 82px; }}
-    .luck-score {{ width: 36px; height: 36px; font-size: .7rem; }}
+    .luck-score {{ width: 36px; height: 36px; font-size: 0.8rem; }}
     .luck-item-grid {{ grid-template-columns: 1fr; }}
   }}
   @media (max-width: 430px) {{
@@ -4482,7 +4482,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   .boss-btn.active {{ border-top-color: var(--gold); border-color: var(--gold); background: #1a1508; }}
   .boss-btn .btn-name {{
     font-family: 'Cinzel', serif;
-    font-size: 0.75rem;
+    font-size: 0.8rem;
     color: var(--gold);
     font-weight: 600;
     letter-spacing: 0.4px;
@@ -4496,13 +4496,13 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
     font-weight: 700;
   }}
   .boss-btn .btn-kc-label {{
-    font-size: 0.62rem;
+    font-size: 0.75rem;
     color: var(--text-muted);
     margin-left: 4px;
     letter-spacing: 1px;
   }}
   .boss-btn .btn-drops {{
-    font-size: 0.7rem;
+    font-size: 0.8rem;
     color: var(--text-dim);
     margin-top: 5px;
   }}
@@ -4566,7 +4566,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
     display: block;
   }}
   .boss-shot-label {{
-    font-size: 0.7rem;
+    font-size: 0.8rem;
     color: var(--text-muted);
     padding: 5px 8px;
     white-space: nowrap;
@@ -4577,10 +4577,10 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
     color: var(--gold-bright);
     margin-left: 4px;
     font-family: 'Cinzel', serif;
-    font-size: 0.65rem;
+    font-size: 0.75rem;
   }}
   .boss-shot-source {{
-    font-size: 0.62rem;
+    font-size: 0.75rem;
     color: var(--text-dim);
     font-style: italic;
     padding: 0 8px 5px 8px;
@@ -4604,7 +4604,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   }}
   .boss-achievement-header {{
     font-family: 'Cinzel', serif;
-    font-size: 0.68rem;
+    font-size: 0.75rem;
     color: #6a9a40;
     letter-spacing: 1.5px;
     text-transform: uppercase;
@@ -4628,7 +4628,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
     align-items: baseline;
     gap: 12px;
   }}
-  .total-gp-banner .gp-label {{ font-family: 'Cinzel', serif; color: var(--text-muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 1.5px; }}
+  .total-gp-banner .gp-label {{ font-family: 'Cinzel', serif; color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1.5px; }}
   .total-gp-banner .gp-value {{ font-family: 'Cinzel', serif; font-size: 2.2rem; font-weight: 700; color: var(--gold-bright); text-shadow: 0 0 20px #f0c04044; }}
   .total-gp-banner .gp-count {{ font-family: 'Cinzel', serif; color: var(--text-dim); font-size: 0.8rem; margin-left: auto; letter-spacing: 1px; }}
 
@@ -4665,7 +4665,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   .memory-page-label {{
     color: #c8bfae;
     font-family: 'Cinzel', serif;
-    font-size: 0.66rem;
+    font-size: 0.75rem;
     min-width: 56px;
     text-align: center;
     letter-spacing: 0.7px;
@@ -4690,12 +4690,12 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   .memory-card-top {{ display: flex; align-items: center; gap: 7px; margin-bottom: 7px; }}
   .memory-badge {{
     font-family: 'Cinzel', serif;
-    font-size: 0.58rem;
+    font-size: 0.75rem;
     letter-spacing: 1px;
     padding: 2px 6px;
     border: 1px solid currentColor;
   }}
-  .memory-year {{ color: #c8bfae; font-size: 0.72rem; margin-left: auto; }}
+  .memory-year {{ color: #c8bfae; font-size: 0.8rem; margin-left: auto; }}
   .memory-title {{
     font-family: 'Cinzel', serif;
     color: #e6dbc4;
@@ -4706,7 +4706,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
     text-overflow: ellipsis;
   }}
   .memory-sub {{ color: #c8bfae; font-size: 0.76rem; margin-top: 4px; }}
-  .memory-date {{ color: #b6aa94; font-size: 0.7rem; margin-top: 8px; }}
+  .memory-date {{ color: #b6aa94; font-size: 0.8rem; margin-top: 8px; }}
 
   .chron-controls {{
     display: flex;
@@ -4720,7 +4720,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
     background: var(--bg-card);
     border: 1px solid var(--border-bright);
     color: var(--text-muted);
-    font-size: 0.68rem;
+    font-size: 0.75rem;
     padding: 6px 14px;
     cursor: pointer;
     letter-spacing: 1px;
@@ -4738,7 +4738,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   }}
   .chron-year-chip {{
     font-family: 'Cinzel', serif;
-    font-size: 0.68rem;
+    font-size: 0.75rem;
     padding: 4px 10px;
     border: 1px solid var(--border);
     background: var(--bg-card);
@@ -4777,7 +4777,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
     margin: 0 0 16px 0;
   }}
   .yr-chips {{ display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 7px; }}
-  .yr-chip {{ font-size: 0.72rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }}
+  .yr-chip {{ font-size: 0.8rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }}
   .yr-chip b {{ font-family: 'Cinzel', serif; font-size: 0.95rem; color: var(--gold); margin-right: 5px; }}
   .yr-prose {{ font-size: 0.82rem; line-height: 1.55; margin: 0; }}
   .chron-entry {{
@@ -4820,7 +4820,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   .chron-body {{ flex: 1; min-width: 0; }}
   .chron-badge {{
     font-family: 'Cinzel', serif;
-    font-size: 0.58rem;
+    font-size: 0.75rem;
     padding: 2px 6px;
     letter-spacing: 1.5px;
     text-transform: uppercase;
@@ -4838,7 +4838,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   }}
   .chron-sub {{ font-size: 0.78rem; color: var(--text-muted); }}
   .chron-date {{
-    font-size: 0.72rem;
+    font-size: 0.8rem;
     color: var(--text-dim);
     font-family: 'Cinzel', serif;
     letter-spacing: 0.5px;
@@ -4853,7 +4853,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
     padding: 24px;
     color: var(--text-dim);
     font-family: 'Cinzel', serif;
-    font-size: 0.65rem;
+    font-size: 0.75rem;
     letter-spacing: 1.5px;
     text-transform: uppercase;
     border-top: 1px solid var(--border);
@@ -4879,7 +4879,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
     border: 1px solid transparent;
     border-radius: 2px;
     color: var(--text-dim);
-    font: 600 9px 'Cinzel', serif;
+    font: 600 11px 'Cinzel', serif;
     letter-spacing: 0.4px;
     text-transform: uppercase;
     text-align: left;
@@ -4898,7 +4898,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
     background: var(--bg-card);
     border: 1px solid var(--border);
     color: var(--text-muted);
-    font: 600 9px 'Cinzel', serif;
+    font: 600 11px 'Cinzel', serif;
     letter-spacing: 0.6px;
     text-transform: uppercase;
     cursor: pointer;
@@ -4934,7 +4934,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   .fb-field {{ margin-bottom: 14px; }}
   .fb-field label {{
     display: block;
-    font: 600 9px 'Cinzel', serif;
+    font: 600 11px 'Cinzel', serif;
     letter-spacing: 0.7px;
     text-transform: uppercase;
     color: var(--text-muted);
@@ -4958,7 +4958,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
     padding: 9px 11px;
     color: var(--text-dim);
     font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
-    font-size: 0.7rem;
+    font-size: 0.8rem;
     line-height: 1.6;
     white-space: pre-wrap;
     word-break: break-word;
@@ -4971,15 +4971,15 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
     color: var(--gold-bright);
   }}
   .fb-actions .fb-primary:hover {{ border-color: var(--gold); }}
-  .fb-note {{ color: var(--text-dim); font-size: 0.72rem; margin: 14px 0 0; line-height: 1.5; }}
+  .fb-note {{ color: var(--text-dim); font-size: 0.8rem; margin: 14px 0 0; line-height: 1.5; }}
 
   .fb-release {{ border-top: 1px solid var(--border); padding-top: 14px; margin-top: 14px; }}
   .fb-release:first-of-type {{ border-top: none; padding-top: 0; margin-top: 0; }}
   .fb-release-head {{ display: flex; align-items: baseline; gap: 9px; flex-wrap: wrap; }}
   .fb-release-tag {{ font: 600 0.82rem 'Cinzel', serif; color: var(--gold-bright); letter-spacing: 0.5px; }}
-  .fb-release-date {{ color: var(--text-dim); font-size: 0.72rem; }}
+  .fb-release-date {{ color: var(--text-dim); font-size: 0.8rem; }}
   .fb-release-current {{
-    font: 600 8px 'Cinzel', serif; letter-spacing: 0.6px; text-transform: uppercase;
+    font: 600 10px 'Cinzel', serif; letter-spacing: 0.6px; text-transform: uppercase;
     color: var(--gold); border: 1px solid var(--gold-dim); padding: 1px 6px;
   }}
   .fb-release-notes {{
@@ -4989,7 +4989,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   /* Patch-note groups. The heading carries the weight so the eye can jump
      between "Added" and "Fixed" without reading the entries under them. */
   .fb-notes-head {{
-    color: var(--gold); font-size: 0.74rem; letter-spacing: 0.08em;
+    color: var(--gold); font-size: 0.8rem; letter-spacing: 0.08em;
     text-transform: uppercase; margin: 12px 0 4px;
   }}
   .fb-notes-head:first-child {{ margin-top: 8px; }}
@@ -5030,17 +5030,17 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   .nav-brand-mark {{ width:38px; height:38px; display:grid; place-items:center; transform:rotate(45deg); border:1px solid var(--border-bright); background:#201907; box-shadow:inset 0 0 0 3px #0e0b06; flex:none; }}
   .nav-brand-mark span {{ transform:rotate(-45deg); font:600 18px 'Cinzel',serif; color:var(--gold-bright); }}
   .nav-brand-title {{ font:600 15px 'Cinzel',serif; color:var(--gold-bright); letter-spacing:.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }}
-  .nav-brand-subtitle {{ font-size:11px; color:var(--text-muted); white-space:nowrap; }}
+  .nav-brand-subtitle {{ font-size:12.5px; color:var(--text-muted); white-space:nowrap; }}
   #side-rail .nav-stack {{ display:flex; flex-direction:column; gap:5px; margin-top:18px; padding:0; background:none; border:0; box-shadow:none; position:static; }}
-  #side-rail .nav-item {{ height:44px; width:100%; display:flex; align-items:center; gap:11px; padding:0 11px; margin:0; color:var(--text-muted); background:transparent; border:1px solid transparent; border-radius:2px; cursor:pointer; text-align:left; font:600 10px 'Cinzel',serif; letter-spacing:.4px; text-transform:uppercase; transition:.16s ease; }}
+  #side-rail .nav-item {{ height:44px; width:100%; display:flex; align-items:center; gap:9px; padding:0 9px; margin:0; color:var(--text-muted); background:transparent; border:1px solid transparent; border-radius:2px; cursor:pointer; text-align:left; font:600 11px 'Cinzel',serif; letter-spacing:.2px; white-space:nowrap; text-transform:uppercase; transition:.16s ease; }}
   #side-rail .nav-item svg, .menu-btn svg, .refresh-btn svg {{ width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; flex:none; }}
   #side-rail .nav-item:hover {{ color:var(--text); background:#18150e; border-color:#3f331e; }}
   #side-rail .nav-item.active {{ color:var(--gold-bright); background:linear-gradient(90deg,#2a210d,#18150e); border-color:#76591c; box-shadow:inset 3px 0 0 var(--gold-bright); }}
   .rail-state {{ padding:13px 7px 0; border-top:1px solid #342a18; display:flex; gap:9px; align-items:flex-start; }}
   .rail-state-dot {{ width:7px; height:7px; border-radius:50%; background:#79a780; box-shadow:0 0 0 3px rgba(121,167,128,.12); margin-top:4px; flex:none; }}
   .rail-state strong,.rail-state span {{ display:block; }}
-  .rail-state strong {{ font:600 8px 'Cinzel',serif; color:var(--text); letter-spacing:.35px; text-transform:uppercase; }}
-  .rail-state span {{ color:var(--text-dim); font-size:10px; margin-top:3px; }}
+  .rail-state strong {{ font:600 10px 'Cinzel',serif; color:var(--text); letter-spacing:.35px; text-transform:uppercase; }}
+  .rail-state span {{ color:var(--text-dim); font-size:12px; margin-top:3px; }}
   header {{ height:66px; margin-left:188px; padding:0; position:sticky; top:0; z-index:120; overflow:visible; display:block; background:rgba(10,9,7,.96); border-bottom:1px solid var(--border); box-shadow:none; }}
   .header-inner {{ width:min(1600px,100%); height:100%; margin:0 auto; padding:0 14px; display:grid; grid-template-columns:minmax(0,1fr) auto auto; align-items:center; gap:18px; }}
   header::before {{ display:none; }}
@@ -5051,12 +5051,12 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   .menu-btn {{ display:none; width:36px; height:36px; place-items:center; background:#17130b; color:var(--gold-bright); border:1px solid var(--border-bright); cursor:pointer; }}
   .app-controls {{ grid-column:2; grid-row:1; min-width:0; flex-direction:row; gap:8px; }}
   .app-controls.ready {{ display:flex; }}
-  .refresh-btn {{ height:34px; display:flex; align-items:center; gap:7px; padding:0 11px; color:var(--gold-bright); border:1px solid var(--border-bright); background:#1c160a; font:600 9px 'Cinzel',serif; letter-spacing:.4px; }}
-  .app-status {{ position:absolute; top:48px; right:20px; max-width:360px; padding:5px 8px; background:#17130b; border:1px solid var(--border); font-size:11px; }}
-  .header-meta {{ grid-column:3; grid-row:1; justify-self:end; display:flex; gap:14px; text-align:right; font-size:10px; line-height:1.25; color:var(--text-dim); }}
+  .refresh-btn {{ height:34px; display:flex; align-items:center; gap:7px; padding:0 11px; color:var(--gold-bright); border:1px solid var(--border-bright); background:#1c160a; font:600 11px 'Cinzel',serif; letter-spacing:.4px; }}
+  .app-status {{ position:absolute; top:48px; right:20px; max-width:360px; padding:5px 8px; background:#17130b; border:1px solid var(--border); font-size:12.5px; }}
+  .header-meta {{ grid-column:3; grid-row:1; justify-self:end; display:flex; gap:14px; text-align:right; font-size:12px; line-height:1.25; color:var(--text-dim); }}
   .header-meta div {{ min-width:92px; }}
   .header-meta div:nth-child(n+3) {{ display:none; }}
-  .header-meta span {{ display:block; margin-top:2px; color:var(--text-muted); font-size:11px; font-weight:400; }}
+  .header-meta span {{ display:block; margin-top:2px; color:var(--text-muted); font-size:12.5px; font-weight:400; }}
   .page {{ width:min(1600px,calc(100% - 188px)); max-width:none; margin:0 0 0 max(188px,calc(50% - 706px)); padding:14px; }}
   .card {{ background:linear-gradient(145deg,#15140e,#0f100d); border-color:#45371d; box-shadow:inset 0 0 0 1px rgba(0,0,0,.32); }}
   .card h2 {{ color:var(--gold-bright); font-size:1rem; letter-spacing:.5px; }}
@@ -5078,7 +5078,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   .stats-lifetime-grid {{ grid-template-columns:repeat(6,1fr); gap:8px; margin:0; }}
   .stats-lifetime-grid .stat-card,.clue-grid .stat-card {{ padding:13px 10px; clip-path:none; text-align:left; background:linear-gradient(145deg,#17170f,#10110e); border-top-width:1px; }}
   .stats-lifetime-grid .stat-card .value,.clue-grid .stat-card .value {{ font-size:1.45rem; }}
-  .stats-lifetime-grid .stat-card .label,.clue-grid .stat-card .label {{ font-size:.58rem; color:var(--text); margin-top:6px; }}
+  .stats-lifetime-grid .stat-card .label,.clue-grid .stat-card .label {{ font-size:0.75rem; color:var(--text); margin-top:6px; }}
   .clue-grid {{ gap:8px; margin:0; }}
   .wealth-card {{ padding:14px 16px; }}
   .wealth-head {{ border-bottom:1px solid #49391c; padding-bottom:10px; }}
@@ -5136,8 +5136,8 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   .section-heading,.journey-toolbar,.skill-journey-heading,.boss-directory-head,.loot-ledger-head,.stats-card-heading {{ display:flex; justify-content:space-between; align-items:flex-start; gap:16px; }}
   .section-heading,.journey-toolbar,.skill-journey-heading,.boss-directory-head,.loot-ledger-head {{ padding-bottom:10px; border-bottom:1px solid #49391c; }}
   .section-heading h2,.journey-toolbar h2,.skill-journey-heading h2,.boss-directory-head h2,.loot-ledger-head h2 {{ margin:0; padding:0; border:0; color:var(--gold-bright); font-size:1rem; }}
-  .section-heading p,.journey-toolbar p,.boss-directory-head p,.loot-ledger-head p {{ margin:4px 0 0; color:#c8bfae; font:11px 'Segoe UI',Arial,sans-serif; }}
-  .section-heading > span {{ color:var(--text-dim); font:10px 'Segoe UI',Arial,sans-serif; }}
+  .section-heading p,.journey-toolbar p,.boss-directory-head p,.loot-ledger-head p {{ margin:4px 0 0; color:#c8bfae; font:12.5px 'Segoe UI',Arial,sans-serif; }}
+  .section-heading > span {{ color:var(--text-dim); font:12px 'Segoe UI',Arial,sans-serif; }}
 
   /* Stats fidelity */
   #page-stats {{ background:transparent; }}
@@ -5148,7 +5148,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   #page-stats .grid-2 > .card {{ min-width:0; }}
   .stats-card-heading {{ align-items:center; margin-bottom:12px; border-bottom:1px solid var(--border); }}
   .stats-card-heading h2 {{ border:0; margin:0; }}
-  .stats-card-heading button {{ border:0; background:none; color:var(--gold); cursor:pointer; font:600 9px 'Cinzel',serif; text-transform:uppercase; }}
+  .stats-card-heading button {{ border:0; background:none; color:var(--gold); cursor:pointer; font:600 11px 'Cinzel',serif; text-transform:uppercase; }}
   .stats-card-heading button:hover {{ color:var(--gold-bright); }}
   .stats-activity-card {{ padding:14px 16px; }}
   .stats-activity-card canvas {{ max-height:220px; }}
@@ -5164,16 +5164,16 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
       linear-gradient(135deg,#18150d 0%,#0b0d0a 52%,#111008 100%);
   }}
   .home-cover-copy {{ display:flex; flex-direction:column; padding:30px 28px 24px; border-right:1px solid #59451f; }}
-  .home-eyebrow,.home-section-head > div > span {{ color:var(--gold); font:600 9px 'Cinzel',serif; letter-spacing:1.5px; text-transform:uppercase; }}
+  .home-eyebrow,.home-section-head > div > span {{ color:var(--gold); font:600 11px 'Cinzel',serif; letter-spacing:1.5px; text-transform:uppercase; }}
   .home-cover-copy h2 {{ max-width:520px; margin:18px 0 10px; padding:0; border:0; color:#f0d18a; font-size:2.1rem; line-height:1.08; letter-spacing:.2px; }}
   .home-cover-copy > p {{ max-width:440px; margin:0; color:#d7cbb6; font:13px/1.55 'Segoe UI',Arial,sans-serif; }}
   .home-window-controls {{ margin-top:auto; padding-top:22px; }}
   .home-cover-actions {{ display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; }}
-  .home-cover-actions button,.home-text-link {{ border:1px solid #6b5123; background:#11110d; color:var(--gold); padding:9px 12px; cursor:pointer; font:600 9px 'Cinzel',serif; letter-spacing:.45px; text-transform:uppercase; }}
+  .home-cover-actions button,.home-text-link {{ border:1px solid #6b5123; background:#11110d; color:var(--gold); padding:9px 12px; cursor:pointer; font:600 11px 'Cinzel',serif; letter-spacing:.45px; text-transform:uppercase; }}
   .home-cover-actions button:first-child {{ color:#161109; background:linear-gradient(135deg,#e2b84d,#9c6f21); border-color:#e4bd59; }}
   .home-cover-actions button:hover,.home-text-link:hover {{ border-color:var(--gold-bright); color:var(--gold-bright); }}
   .home-cover-actions button:first-child:hover {{ color:#0b0905; }}
-  .home-cover-foot {{ display:flex; gap:15px; margin-top:17px; color:#b9aa8e; font:10px 'Segoe UI',Arial,sans-serif; }}
+  .home-cover-foot {{ display:flex; gap:15px; margin-top:17px; color:#b9aa8e; font:12px 'Segoe UI',Arial,sans-serif; }}
   .home-cover-foot span + span::before {{ content:'•'; margin-right:15px; color:#82672f; }}
   .home-moment-grid {{ display:grid; grid-template-columns:repeat(12,1fr); grid-template-rows:repeat(2,minmax(165px,1fr)); gap:5px; min-width:0; background:#080906; }}
   .home-moment {{ position:relative; min-width:0; overflow:hidden; padding:0; border:0; background:#10110d; color:inherit; cursor:pointer; text-align:left; }}
@@ -5187,41 +5187,41 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   .home-moment::after {{ content:''; position:absolute; inset:0; background:linear-gradient(180deg,transparent 35%,rgba(3,4,2,.92)); pointer-events:none; }}
   .home-moment > span {{ position:absolute; z-index:1; left:11px; right:11px; bottom:10px; }}
   .home-moment small,.home-moment strong,.home-moment em {{ display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }}
-  .home-moment small {{ color:#e1b952; font:600 8px 'Segoe UI',Arial,sans-serif; letter-spacing:1px; text-transform:uppercase; }}
-  .home-moment strong {{ margin-top:3px; color:#f0eadf; font:600 10px 'Cinzel',serif; }}
+  .home-moment small {{ color:#e1b952; font:600 10px 'Segoe UI',Arial,sans-serif; letter-spacing:1px; text-transform:uppercase; }}
+  .home-moment strong {{ margin-top:3px; color:#f0eadf; font:600 12px 'Cinzel',serif; }}
   .home-moment em {{ margin-top:3px; color:#c8bfae; font:normal 9px 'Segoe UI',Arial,sans-serif; }}
   .home-moment-featured > span {{ left:18px; right:18px; bottom:16px; }}
   .home-moment-featured strong {{ font-size:1.05rem; }}
   .home-record-strip {{ order:2; display:grid; grid-template-columns:repeat(6,1fr); border:1px solid #49391c; background:linear-gradient(90deg,#10110d,#17150e,#10110d); }}
   .home-record-strip article {{ min-width:0; padding:14px 15px; border-right:1px solid #49391c; }}
   .home-record-strip article:last-child {{ border-right:0; }}
-  .home-record-strip span,.home-record-strip small {{ display:block; color:#c8bfae; font:10px 'Segoe UI',Arial,sans-serif; }}
-  .home-record-strip span {{ color:#d8c595; font:600 8px 'Cinzel',serif; letter-spacing:.8px; text-transform:uppercase; }}
+  .home-record-strip span,.home-record-strip small {{ display:block; color:#c8bfae; font:12px 'Segoe UI',Arial,sans-serif; }}
+  .home-record-strip span {{ color:#d8c595; font:600 10px 'Cinzel',serif; letter-spacing:.8px; text-transform:uppercase; }}
   .home-record-strip strong {{ display:block; margin:5px 0 2px; color:var(--gold-bright); font:600 1.45rem 'Cinzel',serif; }}
   .home-record-strip strong em {{ color:#97886b; font:normal .7rem 'Segoe UI',Arial,sans-serif; }}
   .home-momentum-card {{ order:3; padding:16px 18px; }}
   .home-section-head {{ display:flex; justify-content:space-between; align-items:flex-start; gap:14px; margin-bottom:12px; padding-bottom:10px; border-bottom:1px solid #49391c; }}
   .home-section-head h2 {{ margin:4px 0 0; padding:0; border:0; color:var(--gold-bright); font-size:1rem; }}
-  .home-section-head > small {{ color:#b9aa8e; font:10px 'Segoe UI',Arial,sans-serif; }}
+  .home-section-head > small {{ color:#b9aa8e; font:12px 'Segoe UI',Arial,sans-serif; }}
   .home-section-head .home-text-link {{ padding:7px 9px; border:0; background:transparent; white-space:nowrap; }}
   .home-direction-grid {{ order:4; display:grid; grid-template-columns:1.1fr .9fr; gap:12px; }}
   .home-next-card,.home-clue-card {{ padding:16px 18px; }}
   .home-next-number {{ color:var(--gold-bright); font:600 2rem 'Cinzel',serif; }}
-  .home-next-card > p {{ margin:2px 0 14px; color:#c8bfae; font:11px 'Segoe UI',Arial,sans-serif; }}
+  .home-next-card > p {{ margin:2px 0 14px; color:#c8bfae; font:12.5px 'Segoe UI',Arial,sans-serif; }}
   .home-next-stats {{ display:grid; grid-template-columns:1fr 1fr; margin-bottom:12px; border:1px solid #49391c; }}
   .home-next-stats div {{ padding:10px; border-right:1px solid #49391c; }}
   .home-next-stats div:last-child {{ border:0; }}
   .home-next-stats strong,.home-next-stats span {{ display:block; }}
   .home-next-stats strong {{ color:#dfc474; font:600 12px 'Cinzel',serif; }}
-  .home-next-stats span {{ margin-top:4px; color:#b9aa8e; font:9px 'Segoe UI',Arial,sans-serif; }}
+  .home-next-stats span {{ margin-top:4px; color:#b9aa8e; font:11px 'Segoe UI',Arial,sans-serif; }}
   .home-clue-ledger {{ display:grid; grid-template-columns:repeat(4,1fr); min-height:94px; border:1px solid #49391c; }}
   .home-clue-ledger div {{ display:flex; flex-direction:column; justify-content:center; align-items:center; border-right:1px solid #49391c; }}
   .home-clue-ledger div:last-child {{ border:0; }}
   .home-clue-ledger strong {{ font:600 1.5rem 'Cinzel',serif; }}
-  .home-clue-ledger span {{ margin-top:5px; color:#c8bfae; font:8px 'Cinzel',serif; text-transform:uppercase; }}
+  .home-clue-ledger span {{ margin-top:5px; color:#c8bfae; font:10px 'Cinzel',serif; text-transform:uppercase; }}
   .home-wealth-card {{ order:5; }}
   .home-wealth-details {{ margin-top:10px; border-top:1px solid #49391c; }}
-  .home-wealth-details summary {{ padding:12px 0 2px; color:#d4c4a0; cursor:pointer; font:600 9px 'Cinzel',serif; letter-spacing:.5px; text-transform:uppercase; }}
+  .home-wealth-details summary {{ padding:12px 0 2px; color:#d4c4a0; cursor:pointer; font:600 11px 'Cinzel',serif; letter-spacing:.5px; text-transform:uppercase; }}
   .home-wealth-details .wealth-pending {{ margin-top:10px; }}
   .home-legacy-grid {{ order:6; margin:0 !important; }}
   .home-scroll-card {{ min-height:0; padding:15px 16px !important; }}
@@ -5235,11 +5235,11 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   .fav-toolbar[hidden] {{ display:none; }}
   .fav-toolbar .luck-sort-controls {{ margin-top:0; }}
   .fav-toolbar .luck-sort-controls button {{ height:26px; flex:none; }}
-  .fav-columns {{ display:flex; flex:none; gap:10px; color:#c8bfae; font:600 8px 'Cinzel',serif; letter-spacing:.6px; text-transform:uppercase; }}
+  .fav-columns {{ display:flex; flex:none; gap:10px; color:#c8bfae; font:600 10px 'Cinzel',serif; letter-spacing:.6px; text-transform:uppercase; }}
   .fav-columns span {{ text-align:right; }}
   .fav-columns span:first-child {{ min-width:42px; }}
   .fav-columns span:last-child,.fav-rank {{ min-width:58px; }}
-  .fav-rank {{ font-size:0.72rem; color:var(--text-dim); text-align:right; }}
+  .fav-rank {{ font-size:0.8rem; color:var(--text-dim); text-align:right; }}
   .rtm-remaining.fav-sorted,.fav-rank.fav-sorted {{ color:var(--gold); }}
   .home-scroll-card #fav-bosses.has-ranks {{ max-height:306px; scrollbar-gutter:stable; }}
   .home-activity-card {{ order:7; margin:0 !important; padding:15px 16px; }}
@@ -5266,49 +5266,55 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   /* Maxing Journey */
   .journey-summary-grid {{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }}
   .journey-summary-card {{ min-height:82px; display:grid; grid-template-columns:58px minmax(0,1fr); gap:12px; align-items:center; padding:12px 14px; border:1px solid #45371d; background:linear-gradient(145deg,#17170f,#10110e); }}
-  .journey-summary-card > span {{ width:56px; height:56px; display:grid; place-items:center; border:1px solid var(--gold-dim); border-radius:50%; background:#12130f; color:var(--gold-bright); font:700 10px 'Cinzel',serif; letter-spacing:.15px; }}
+  .journey-summary-card > span {{ width:56px; height:56px; display:grid; place-items:center; border:1px solid var(--gold-dim); border-radius:50%; background:#12130f; color:var(--gold-bright); font:700 12px 'Cinzel',serif; letter-spacing:.15px; }}
   .journey-summary-card strong,.journey-summary-card small {{ display:block; }}
   .journey-summary-card strong {{ color:var(--gold-bright); font:600 1.2rem 'Cinzel',serif; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }}
-  .journey-summary-card small {{ margin-top:4px; color:#d8cdb8; font:10px 'Segoe UI',Arial,sans-serif; text-transform:uppercase; }}
+  .journey-summary-card small {{ margin-top:4px; color:#d8cdb8; font:12px 'Segoe UI',Arial,sans-serif; text-transform:uppercase; }}
   .journey-road-card,.account-journey-card,.skill-journey-card {{ padding:14px 16px; }}
   .journey-road-layout {{ display:grid; grid-template-columns:minmax(0,1.25fr) minmax(350px,.75fr); gap:18px; padding-top:11px; }}
   #rtm-detail {{ display:grid; grid-template-columns:1fr 1fr; gap:5px 14px; align-content:start; }}
   #rtm-detail .rtm-detail-row {{ padding:7px 8px; border:1px solid #40351f; background:#0d0f0c; }}
   #rtm-detail .rtm-detail-top {{ margin-bottom:5px; }}
-  #rtm-detail .rtm-detail-meta {{ font-family:'Segoe UI',Arial,sans-serif; font-size:10px; }}
+  #rtm-detail .rtm-detail-meta {{ font-family:'Segoe UI',Arial,sans-serif; font-size:11px; }}
+  /* One line per skill summary where the tiles are wide enough to hold it.
+     Narrower than this the three parts wrap, because forcing them onto one
+     line pushed the tile past the edge of the window. */
+  @media (min-width:1181px) {{
+    #rtm-detail .rtm-detail-meta span {{ white-space:nowrap; }}
+  }}
   .journey-xp-panel {{ min-width:0; padding-left:16px; border-left:1px solid #49391c; }}
-  .journey-xp-panel h3 {{ margin-bottom:9px; color:var(--text); font:600 10px 'Cinzel',serif; text-transform:uppercase; }}
+  .journey-xp-panel h3 {{ margin-bottom:9px; color:var(--text); font:600 12px 'Cinzel',serif; text-transform:uppercase; }}
   .journey-xp-panel canvas {{ max-height:240px; }}
   .journey-controls {{ display:grid; gap:6px; }}
   .journey-controls > div {{ display:flex; justify-content:flex-end; gap:5px; }}
-  .journey-controls button,.boss-category-tabs button,.boss-controls button {{ height:30px; padding:0 9px; border:1px solid var(--border-bright); background:#0d0e0b; color:#c8bfae; cursor:pointer; font:600 8px 'Cinzel',serif; text-transform:uppercase; }}
+  .journey-controls button,.boss-category-tabs button,.boss-controls button {{ height:30px; padding:0 9px; border:1px solid var(--border-bright); background:#0d0e0b; color:#c8bfae; cursor:pointer; font:600 10px 'Cinzel',serif; text-transform:uppercase; }}
   .journey-controls button:hover,.journey-controls button.active,.boss-category-tabs button:hover,.boss-category-tabs button.active,.boss-controls button:hover {{ color:var(--gold-bright); border-color:var(--gold); background:#2a210d; }}
   .journey-focus-shell {{ overflow:auto; padding-top:11px; }}
   #journey-focus-map {{ width:max(100%,var(--journey-min-width,760px)); min-width:760px; }}
   .journey-axis,.journey-focus-row {{ width:100%; box-sizing:border-box; display:grid; grid-template-columns:100px repeat(var(--month-count),minmax(18px,1fr)); gap:3px; align-items:center; }}
   .journey-axis {{ margin-bottom:5px; }}
-  .journey-axis span {{ color:var(--text-dim); font:9px 'Segoe UI',Arial,sans-serif; text-align:center; }}
-  .journey-axis strong,.journey-skill-pick {{ color:var(--text); font:600 9px 'Cinzel',serif; }}
+  .journey-axis span {{ color:var(--text-dim); font:11px 'Segoe UI',Arial,sans-serif; text-align:center; }}
+  .journey-axis strong,.journey-skill-pick {{ color:var(--text); font:600 11px 'Cinzel',serif; }}
   .journey-skill-pick {{ padding:0; border:0; background:none; cursor:pointer; text-align:left; }}
   .journey-skill-pick:hover,.journey-skill-pick:focus-visible {{ color:var(--gold-bright); text-decoration:underline; }}
   .journey-focus-row {{ min-height:26px; border-bottom:1px solid #2e291d; }}
   .journey-cell {{ height:16px; border:1px solid transparent; background:#11110d; }}
   button.journey-cell {{ cursor:pointer; background:var(--skill-color); border-color:color-mix(in srgb,var(--skill-color) 70%,#fff 15%); box-shadow:0 0 5px color-mix(in srgb,var(--skill-color) 40%,transparent); }}
   button.journey-cell:hover,button.journey-cell:focus-visible {{ filter:brightness(1.25); outline:1px solid var(--gold); }}
-  .journey-coverage {{ margin-top:9px; color:#c8bfae; font:10px 'Segoe UI',Arial,sans-serif; }}
-  .skill-journey-heading > div > span {{ color:var(--gold); font:600 8px 'Cinzel',serif; text-transform:uppercase; }}
-  .skill-journey-heading label {{ color:#c8bfae; font:10px 'Segoe UI',Arial,sans-serif; }}
+  .journey-coverage {{ margin-top:9px; color:#c8bfae; font:12px 'Segoe UI',Arial,sans-serif; }}
+  .skill-journey-heading > div > span {{ color:var(--gold); font:600 10px 'Cinzel',serif; text-transform:uppercase; }}
+  .skill-journey-heading label {{ color:#c8bfae; font:12px 'Segoe UI',Arial,sans-serif; }}
   .skill-journey-heading select {{ margin-left:7px; height:30px; min-width:145px; border:1px solid var(--border-bright); background:#0d0e0b; color:var(--gold-bright); }}
-  .journey-sequence-meta {{ margin:8px 0 12px; color:#c8bfae; font:11px 'Segoe UI',Arial,sans-serif; }}
+  .journey-sequence-meta {{ margin:8px 0 12px; color:#c8bfae; font:12.5px 'Segoe UI',Arial,sans-serif; }}
   #journey-sequence {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(165px,1fr)); gap:10px; }}
   .journey-level {{ min-width:0; }}
   .journey-level button {{ display:block; width:100%; padding:0; border:1px solid var(--border-bright); background:#0d0e0b; color:var(--text); cursor:pointer; text-align:left; }}
   .journey-level button:hover,.journey-level button:focus-visible {{ border-color:var(--gold); outline:none; }}
   .journey-level img {{ display:block; width:100%; height:105px; object-fit:cover; }}
   .journey-level-caption {{ display:flex; justify-content:space-between; gap:8px; padding:9px; }}
-  .journey-level-caption strong {{ color:var(--gold-bright); font:600 10px 'Cinzel',serif; }}
-  .journey-level-caption span {{ color:#c8bfae; font:10px 'Segoe UI',Arial,sans-serif; text-align:right; }}
-  .journey-more {{ display:block; margin:12px auto 0; padding:9px 16px; border:1px solid var(--border-bright); background:#1c160a; color:var(--gold-bright); cursor:pointer; font:600 9px 'Cinzel',serif; }}
+  .journey-level-caption strong {{ color:var(--gold-bright); font:600 12px 'Cinzel',serif; }}
+  .journey-level-caption span {{ color:#c8bfae; font:12px 'Segoe UI',Arial,sans-serif; text-align:right; }}
+  .journey-more {{ display:block; margin:12px auto 0; padding:9px 16px; border:1px solid var(--border-bright); background:#1c160a; color:var(--gold-bright); cursor:pointer; font:600 11px 'Cinzel',serif; }}
   .journey-more[hidden] {{ display:none; }}
   .journey-more:hover {{ border-color:var(--gold); }}
 
@@ -5317,16 +5323,17 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   .boss-summary-grid article,.loot-summary-grid article {{ min-height:76px; padding:12px 14px; border:1px solid #45371d; background:linear-gradient(145deg,#17170f,#10110e); }}
   .boss-summary-grid strong,.boss-summary-grid span,.boss-summary-grid small,.loot-summary-grid strong,.loot-summary-grid span,.loot-summary-grid small {{ display:block; }}
   .boss-summary-grid strong,.loot-summary-grid strong {{ color:var(--gold-bright); font:600 1.25rem 'Cinzel',serif; }}
-  .boss-summary-grid span,.loot-summary-grid span {{ margin-top:5px; color:var(--text); font:600 9px 'Cinzel',serif; text-transform:uppercase; }}
-  .boss-summary-grid small,.loot-summary-grid small {{ margin-top:3px; color:#c8bfae; font:10px 'Segoe UI',Arial,sans-serif; }}
+  .boss-summary-grid span,.loot-summary-grid span {{ margin-top:5px; color:var(--text); font:600 11px 'Cinzel',serif; text-transform:uppercase; }}
+  .boss-summary-grid small,.loot-summary-grid small {{ margin-top:3px; color:#c8bfae; font:12px 'Segoe UI',Arial,sans-serif; }}
   .boss-workspace {{ padding:12px 14px; }}
   .boss-category-tabs {{ display:flex; gap:5px; overflow:auto; padding-bottom:9px; border-bottom:1px solid #49391c; }}
+  .boss-category-tabs button {{ flex:none; white-space:nowrap; }}
   .boss-browser {{ display:grid; grid-template-columns:minmax(470px,.95fr) minmax(430px,1.05fr); gap:14px; padding-top:11px; }}
   .boss-directory-pane {{ min-width:0; }}
   .boss-controls {{ display:flex; gap:6px; }}
-  .boss-controls input {{ width:180px; height:30px; padding:0 9px; border:1px solid var(--border-bright); background:#0d0e0b; color:var(--text); font:11px 'Segoe UI',Arial,sans-serif; }}
+  .boss-controls input {{ width:180px; height:30px; padding:0 9px; border:1px solid var(--border-bright); background:#0d0e0b; color:var(--text); font:12.5px 'Segoe UI',Arial,sans-serif; }}
   .boss-sort-row {{ display:flex; gap:5px; overflow:auto; padding-top:9px; }}
-  .boss-sort-row button {{ height:30px; padding:0 9px; flex:none; border:1px solid var(--border-bright); background:#0d0e0b; color:#c8bfae; cursor:pointer; font:600 8px 'Cinzel',serif; text-transform:uppercase; }}
+  .boss-sort-row button {{ height:30px; padding:0 9px; flex:none; border:1px solid var(--border-bright); background:#0d0e0b; color:#c8bfae; cursor:pointer; font:600 10px 'Cinzel',serif; text-transform:uppercase; }}
   .boss-sort-row button:hover,.boss-sort-row button.active {{ color:var(--gold-bright); border-color:var(--gold); background:#2a210d; }}
   .boss-directory-card .boss-card-rank {{ color:var(--gold); }}
   /* A boss listed from its kill count alone has no screenshot to show, so
@@ -5339,8 +5346,8 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   .boss-directory-card.active {{ box-shadow:inset 3px 0 0 var(--gold-bright); }}
   .boss-directory-card img,.boss-card-monogram {{ width:64px; height:64px; object-fit:cover; border:1px solid #59451f; background:#171309; }}
   .boss-card-monogram {{ display:grid; place-items:center; color:var(--gold-bright); font:600 16px 'Cinzel',serif; }}
-  .boss-directory-card strong {{ display:block; color:var(--text); font:600 10px 'Cinzel',serif; }}
-  .boss-directory-card span,.boss-directory-card small {{ display:block; margin-top:4px; color:#c8bfae; font:10px 'Segoe UI',Arial,sans-serif; }}
+  .boss-directory-card strong {{ display:block; color:var(--text); font:600 12px 'Cinzel',serif; }}
+  .boss-directory-card span,.boss-directory-card small {{ display:block; margin-top:4px; color:#c8bfae; font:12px 'Segoe UI',Arial,sans-serif; }}
   .boss-detail-pane {{ min-width:0; padding-left:14px; border-left:1px solid #49391c; }}
   .boss-detail-hero-new {{ display:grid; grid-template-columns:118px minmax(0,1fr); gap:12px; padding-bottom:11px; border-bottom:1px solid #49391c; }}
   .boss-detail-hero-new img,.boss-detail-monogram {{ width:118px; height:90px; object-fit:cover; border:1px solid var(--gold-dim); background:#171309; }}
@@ -5348,26 +5355,26 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   .boss-hero-shot:hover img,.boss-hero-shot:focus-visible img {{ border-color:var(--gold-bright); }}
   .boss-detail-monogram {{ display:grid; place-items:center; color:var(--gold-bright); font:600 24px 'Cinzel',serif; }}
   .boss-detail-hero-new h2 {{ margin:0; padding:0; border:0; font-size:1.05rem; }}
-  .boss-detail-hero-new p {{ margin:5px 0 0; color:#c8bfae; font:11px 'Segoe UI',Arial,sans-serif; }}
+  .boss-detail-hero-new p {{ margin:5px 0 0; color:#c8bfae; font:12.5px 'Segoe UI',Arial,sans-serif; }}
   .boss-evidence-stats {{ display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin:10px 0; }}
   .boss-evidence-stats div {{ padding:8px; border:1px solid #44371f; background:#0d0e0b; text-align:center; }}
   .boss-evidence-stats strong,.boss-evidence-stats span {{ display:block; }}
   .boss-evidence-stats strong {{ color:var(--gold-bright); font:600 14px 'Cinzel',serif; }}
-  .boss-evidence-stats span {{ margin-top:3px; color:#c8bfae; font:9px 'Segoe UI',Arial,sans-serif; }}
+  .boss-evidence-stats span {{ margin-top:3px; color:#c8bfae; font:11px 'Segoe UI',Arial,sans-serif; }}
   .boss-evidence-section {{ margin-top:10px; }}
-  .boss-evidence-section h3 {{ margin-bottom:6px; color:var(--text); font:600 9px 'Cinzel',serif; text-transform:uppercase; }}
+  .boss-evidence-section h3 {{ margin-bottom:6px; color:var(--text); font:600 11px 'Cinzel',serif; text-transform:uppercase; }}
   .boss-evidence-grid {{ display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }}
   .boss-evidence-card {{ min-width:0; border:1px solid #44371f; background:#0d0f0c; cursor:pointer; color:inherit; text-align:left; }}
   .boss-evidence-card:hover {{ border-color:var(--gold); }}
   .boss-evidence-card img {{ width:100%; aspect-ratio:16/9; object-fit:cover; display:block; }}
-  .boss-evidence-card span {{ display:block; padding:6px; overflow:hidden; color:#d8cdb8; font:10px 'Segoe UI',Arial,sans-serif; white-space:nowrap; text-overflow:ellipsis; }}
+  .boss-evidence-card span {{ display:block; padding:6px; overflow:hidden; color:#d8cdb8; font:12px 'Segoe UI',Arial,sans-serif; white-space:nowrap; text-overflow:ellipsis; }}
 
   /* Loot ledger */
   .loot-summary-grid {{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }}
   .loot-ledger {{ padding:14px 16px; }}
-  .loot-ledger-head > div:first-child > span {{ color:var(--gold); font:600 8px 'Cinzel',serif; text-transform:uppercase; }}
+  .loot-ledger-head > div:first-child > span {{ color:var(--gold); font:600 10px 'Cinzel',serif; text-transform:uppercase; }}
   .loot-table-head,.loot-row {{ display:grid; grid-template-columns:minmax(220px,1.6fr) 130px 130px; gap:12px; align-items:center; }}
-  .loot-table-head {{ padding:8px 10px; color:var(--text-dim); font:600 8px 'Cinzel',serif; text-transform:uppercase; }}
+  .loot-table-head {{ padding:8px 10px; color:var(--text-dim); font:600 10px 'Cinzel',serif; text-transform:uppercase; }}
   .loot-row {{ min-height:76px; padding:8px 10px; border-top:1px solid #3f341f; }}
   .loot-row:hover {{ background:#15130c; }}
   .loot-row-main {{ display:grid; grid-template-columns:92px minmax(0,1fr); gap:10px; align-items:center; }}
@@ -5377,8 +5384,8 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   .loot-thumb-btn:hover,.loot-thumb-btn:focus-visible {{ border-color:var(--gold-bright); outline:none; box-shadow:0 0 0 2px rgba(200,146,42,.18); }}
   .loot-thumb-btn:hover img,.loot-thumb-btn:focus-visible img {{ transform:scale(1.035); }}
   .loot-row strong,.loot-row span {{ display:block; }}
-  .loot-row strong {{ color:var(--text); font:600 11px 'Cinzel',serif; }}
-  .loot-row span {{ color:#c8bfae; font:10px 'Segoe UI',Arial,sans-serif; }}
+  .loot-row strong {{ color:var(--text); font:600 12.5px 'Cinzel',serif; }}
+  .loot-row span {{ color:#c8bfae; font:12px 'Segoe UI',Arial,sans-serif; }}
   .loot-row-value {{ color:var(--gold-bright) !important; font:600 12px 'Cinzel',serif !important; }}
 
   /* Gallery and Chronicle */
@@ -5400,12 +5407,12 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   .chron-story-media img {{ width:100%; height:100%; object-fit:cover; display:block; }}
   .chron-story-media button:hover {{ border-color:var(--gold); }}
   .chron-story-body {{ min-width:0; }}
-  .chron-story-date {{ color:var(--gold); font:600 9px 'Cinzel',serif; text-transform:uppercase; }}
+  .chron-story-date {{ color:var(--gold); font:600 11px 'Cinzel',serif; text-transform:uppercase; }}
   .chron-story-event {{ padding:7px 0; border-bottom:1px solid #2e291d; }}
   .chron-story-event:last-child {{ border-bottom:0; }}
   .chron-story-event strong,.chron-story-event span {{ display:block; }}
-  .chron-story-event strong {{ color:var(--text); font:600 10px 'Cinzel',serif; }}
-  .chron-story-event span {{ margin-top:3px; color:#c8bfae; font:10px 'Segoe UI',Arial,sans-serif; }}
+  .chron-story-event strong {{ color:var(--text); font:600 12px 'Cinzel',serif; }}
+  .chron-story-event span {{ margin-top:3px; color:#c8bfae; font:12px 'Segoe UI',Arial,sans-serif; }}
 
   @media(max-width:1180px) {{
     .home-cover {{ grid-template-columns:minmax(255px,.78fr) minmax(0,1.22fr); }}
