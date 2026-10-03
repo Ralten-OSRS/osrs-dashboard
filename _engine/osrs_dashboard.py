@@ -1097,6 +1097,40 @@ def luck_verdict(pct):
         return "Dry"
     return "Scammed by Gielinor"
 
+# Skill colors were chosen for bars and map cells, where a dark hue reads fine
+# as a filled shape. As text on a near-black card several of them fail badly
+# (Thieving's purple measures 1.7:1). Text uses the same hue lifted toward a
+# warm white until it clears the WCAG 4.5:1 floor for body text; bars and
+# cells keep the original color.
+_CARD_BACKGROUND = "#14130d"
+_TEXT_LIFT_TARGET = (240, 230, 208)
+
+
+def _relative_luminance(hex_color):
+    channels = [int(hex_color.lstrip("#")[i:i + 2], 16) / 255 for i in (0, 2, 4)]
+    linear = [c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4 for c in channels]
+    return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
+
+
+def contrast_ratio(color_a, color_b):
+    lighter, darker = sorted((_relative_luminance(color_a), _relative_luminance(color_b)), reverse=True)
+    return (lighter + 0.05) / (darker + 0.05)
+
+
+def readable_text_color(hex_color, minimum=4.5, background=_CARD_BACKGROUND):
+    """Return hex_color, lightened only as far as needed to read as text."""
+    base = [int(hex_color.lstrip("#")[i:i + 2], 16) for i in (0, 2, 4)]
+    for step in range(0, 21):
+        mix = step / 20
+        lifted = "#" + "".join(
+            f"{round(channel + (target - channel) * mix):02x}"
+            for channel, target in zip(base, _TEXT_LIFT_TARGET)
+        )
+        if contrast_ratio(lifted, background) >= minimum:
+            return lifted
+    return "#f0e6d0"
+
+
 # Boss categories for the Boss tab. Display order top-to-bottom. Any boss with
 # screenshot content but not listed here falls into "Other" at the bottom.
 BOSS_CATEGORIES = [
@@ -2426,6 +2460,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
             "remaining": 99 - level,
             "pct": pct,
             "color": color,
+            "text_color": readable_text_color(color),
             "xp_remaining": xp_remaining if xp_remaining is not None else -1,
             "xp_rem_str": fmt_gp(xp_remaining) if xp_remaining else "",
             "rate": int(rate) if rate else 0,
@@ -7183,7 +7218,7 @@ function renderFavBosses() {{
     const eta = s.eta_label || 'Not currently training';
     html += '<div class="rtm-detail-row">'
       + '<div class="rtm-detail-top">'
-      + '<span class="rtm-skill-lg" style="color:' + s.color + '">' + s.skill + '</span>'
+      + '<span class="rtm-skill-lg" style="color:' + (s.text_color || s.color) + '">' + s.skill + '</span>'
       + badge
       + '<span class="rtm-detail-level">Lv ' + s.level + '</span>'
       + '</div>'
