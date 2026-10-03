@@ -1097,6 +1097,40 @@ def luck_verdict(pct):
         return "Dry"
     return "Scammed by Gielinor"
 
+# Skill colors were chosen for bars and map cells, where a dark hue reads fine
+# as a filled shape. As text on a near-black card several of them fail badly
+# (Thieving's purple measures 1.7:1). Text uses the same hue lifted toward a
+# warm white until it clears the WCAG 4.5:1 floor for body text; bars and
+# cells keep the original color.
+_CARD_BACKGROUND = "#14130d"
+_TEXT_LIFT_TARGET = (240, 230, 208)
+
+
+def _relative_luminance(hex_color):
+    channels = [int(hex_color.lstrip("#")[i:i + 2], 16) / 255 for i in (0, 2, 4)]
+    linear = [c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4 for c in channels]
+    return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
+
+
+def contrast_ratio(color_a, color_b):
+    lighter, darker = sorted((_relative_luminance(color_a), _relative_luminance(color_b)), reverse=True)
+    return (lighter + 0.05) / (darker + 0.05)
+
+
+def readable_text_color(hex_color, minimum=4.5, background=_CARD_BACKGROUND):
+    """Return hex_color, lightened only as far as needed to read as text."""
+    base = [int(hex_color.lstrip("#")[i:i + 2], 16) for i in (0, 2, 4)]
+    for step in range(0, 21):
+        mix = step / 20
+        lifted = "#" + "".join(
+            f"{round(channel + (target - channel) * mix):02x}"
+            for channel, target in zip(base, _TEXT_LIFT_TARGET)
+        )
+        if contrast_ratio(lifted, background) >= minimum:
+            return lifted
+    return "#f0e6d0"
+
+
 # Boss categories for the Boss tab. Display order top-to-bottom. Any boss with
 # screenshot content but not listed here falls into "Other" at the bottom.
 BOSS_CATEGORIES = [
@@ -1434,6 +1468,65 @@ def parse_valuable_drop(filename):
         value = int(match.group(3).replace(',', ''))
         return item, qty, value
     return None, 1, 0
+
+
+# RuneLite appends a timestamp to every screenshot it saves, and sometimes a
+# "(2)" when two land in the same second. On a card that timestamp is noise:
+# the formatted date is printed underneath, and at card width it pushes the
+# part worth reading (the item, the quest, the skill) off the end of the line.
+_TRAILING_STAMP_RE = re.compile(
+    r'[\s_]*(?:'
+    r'\d{4}-\d{2}-\d{2}(?:[ _]\d{2}-\d{2}-\d{2}| at \d{1,2}\.\d{2}\.\d{2} (?:AM|PM)| \d{6})?'
+    r'|\d{8}_\d{6}'
+    r')\s*(?:\(\d+\))?\s*$',
+    re.IGNORECASE,
+)
+_TITLE_FALLBACKS = {"Manual Screenshots": "Manual screenshot"}
+
+
+def display_title(filename, category):
+    """Readable title for a screenshot card: the filename with its timestamp
+    removed and the category's own prefix dropped, since the card already names
+    the category. The file on disk is never renamed, and Gallery search still
+    matches the original filename through the screenshot's path."""
+    title = Path(filename).stem
+    while True:
+        stripped = _TRAILING_STAMP_RE.sub('', title)
+        if stripped == title:
+            break
+        title = stripped
+    title = title.strip(' _-')
+
+    if category == "Level-Ups":
+        skill, level = parse_level_up(filename)
+        if skill and level:
+            return f"{skill} level {level}"
+    elif category == "Quests":
+        quest = parse_quest_name(filename)
+        if quest:
+            return quest
+    elif category == "Combat Tasks":
+        task = parse_combat_task(filename)
+        if task:
+            return task
+    elif category == "Collection Log":
+        match = re.match(r'Collection log \((.+)\)$', title, re.IGNORECASE)
+        if match:
+            return match.group(1).strip()
+    elif category == "Valuable Drops":
+        title = re.sub(r'^Valuable drop\s+', '', title, flags=re.IGNORECASE)
+    elif category == "Untradeable Drops":
+        title = re.sub(r'^Untradeable drop\s+', '', title, flags=re.IGNORECASE)
+    elif category == "Clue Scroll Rewards":
+        match = re.match(r'([A-Za-z]+)\((\d+)\)$', title)
+        if match:
+            return f"{match.group(1)} clue {match.group(2)}"
+
+    title = re.sub(r'(?<=\S)\((\d+)\)$', r' (\1)', title)
+    title = re.sub(r'\s{2,}', ' ', title).strip()
+    if not title or title.lower() == "screenshot":
+        return _TITLE_FALLBACKS.get(category, category)
+    return title
 
 
 HOME_MOMENT_CATEGORIES = {
@@ -2367,6 +2460,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
             "remaining": 99 - level,
             "pct": pct,
             "color": color,
+            "text_color": readable_text_color(color),
             "xp_remaining": xp_remaining if xp_remaining is not None else -1,
             "xp_rem_str": fmt_gp(xp_remaining) if xp_remaining else "",
             "rate": int(rate) if rate else 0,
@@ -2720,6 +2814,10 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
             "category": category,
             "kc": hs_bosses.get(boss, 0),
             "rank": hs_boss_ranks.get(boss, 0),
+            # Shared-drop tiles are a place to file loot, not an encounter:
+            # they have no kill count and should never be the page's opening
+            # selection.
+            "virtual": boss in VIRTUAL_BOSSES,
             "gp": boss_gp_total.get(boss, 0),
             "gp_str": fmt_gp(boss_gp_total.get(boss, 0)) if boss_gp_total.get(boss, 0) else "",
             "representative": _boss_evidence[0]["src"] if _boss_evidence else "",
@@ -2929,7 +3027,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
             "src": item["rel_path"],
             "path": item["rel_path"],
             "cat": item["category"],
-            "label": Path(item["filename"]).stem,
+            "label": display_title(item["filename"], item["category"]),
             "ts": item["ts_str"],
             "sort": item["ts_sort"],
         })
@@ -2943,13 +3041,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
         for _moment in select_home_moments(data["gallery_items"], window_days=_days,
                                            reference_date=home_reference_date):
             _category = _moment["category"]
-            _label = Path(_moment["filename"]).stem
-            if _category == "Level-Ups":
-                _skill, _level = parse_level_up(_moment["filename"])
-                if _skill and _level:
-                    _label = f"{_skill} level {_level}"
-            elif _category == "Quests":
-                _label = parse_quest_name(_moment["filename"]) or _label
+            _label = display_title(_moment["filename"], _category)
             home_moments.append({
                 "src": _moment["rel_path"],
                 "label": _label,
@@ -3001,9 +3093,42 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
     drops_json = [
         {"item": d["item"], "qty": d["qty"], "value": d["value"],
          "src": d["rel_path"], "ts": d["ts_str"],
-         "ts_iso": d["timestamp"].isoformat() if d["timestamp"] else ""}
+         "ts_iso": d["timestamp"].isoformat() if d["timestamp"] else "",
+         "kind": "drop"}
         for d in drops_sorted
     ]
+    # Completed assemblies are part of the realized total in the page headline,
+    # so they are rows in the ledger beneath it. Without them the rows added up
+    # to direct drops only and the headline could not be reconciled against the
+    # list titled as the evidence behind it. Each row carries the screenshots of
+    # the components that completed it.
+    assembled_rows = 0
+    for event in economic_value.get("events", []):
+        try:
+            completed_at = datetime.fromisoformat(event["completed_at"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        shots = [
+            {"src": piece["rel_path"], "label": piece.get("item", "")}
+            for piece in event.get("evidence", [])
+            if piece.get("rel_path")
+        ]
+        drops_json.append({
+            "item": event.get("label", "Completed assembly"), "qty": 1,
+            "value": int(event.get("value", 0)),
+            "src": shots[0]["src"] if shots else "",
+            "ts": completed_at.strftime("%b %d, %Y"),
+            "ts_iso": completed_at.isoformat(),
+            "kind": "assembled",
+            "shots": shots,
+        })
+        assembled_rows += 1
+    ledger_rows = len(drops_json)
+    ledger_note = (
+        f"{len(drops_sorted):,} drop{'s' if len(drops_sorted) != 1 else ''} and "
+        f"{assembled_rows:,} completed assembl{'ies' if assembled_rows != 1 else 'y'}"
+        if assembled_rows else "Every row opens its evidence"
+    )
 
     pending_value = int(economic_value.get("latent_total", 0))
     pending_value_str = fmt_gp(pending_value) if pending_value else "None"
@@ -3159,7 +3284,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
     if hof_sorted:
         for idx, h in enumerate(hof_sorted):
             has_shot = bool(h.get("rel_path"))
-            click_attr = f' onclick="openHofItem({idx})" style="cursor:pointer"' if has_shot else ''
+            click_attr = f' onclick="openHofItem({idx})" tabindex="0" role="button" style="cursor:pointer"' if has_shot else ''
             hof_html += (
                 f'<div class="hof-item"{click_attr}>'
                 + ('<img class="hof-shot" src="' + h.get("rel_path", "") + '" alt="" loading="lazy">' if has_shot else '')
@@ -3862,6 +3987,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   }}
   .pet-thumb:hover {{ border-color: var(--gold); }}
   .pet-thumb:focus-visible {{ outline: 2px solid var(--gold-bright); outline-offset: 2px; }}
+  .gallery-item:focus-visible,.memory-card:focus-visible,.hof-item:focus-visible {{ outline: 2px solid var(--gold-bright); outline-offset: 2px; }}
   .pet-thumb img {{
     width: 100%;
     height: 70px;
@@ -5196,7 +5322,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
      its initials stand in. The generic card span rule below would otherwise
      shrink them into the corner of the tile. */
   .boss-directory-card .boss-card-monogram {{ display:grid; place-items:center; margin-top:0; color:var(--gold-bright); font:600 16px 'Cinzel',serif; }}
-  .boss-card-grid {{ display:grid; grid-template-columns:1fr 1fr; gap:6px; max-height:620px; overflow:auto; padding:8px 4px 0 0; }}
+  .boss-card-grid {{ display:grid; grid-template-columns:repeat(auto-fill,minmax(236px,1fr)); gap:6px; max-height:620px; overflow:auto; padding:8px 4px 0 0; }}
   .boss-directory-card {{ min-height:82px; display:grid; grid-template-columns:64px minmax(0,1fr); gap:9px; padding:7px; border:1px solid #44371f; background:#0d0f0c; color:inherit; cursor:pointer; text-align:left; }}
   .boss-directory-card:hover,.boss-directory-card.active {{ border-color:var(--gold); background:#18150d; }}
   .boss-directory-card.active {{ box-shadow:inset 3px 0 0 var(--gold-bright); }}
@@ -5236,6 +5362,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   .loot-row-main {{ display:grid; grid-template-columns:92px minmax(0,1fr); gap:10px; align-items:center; }}
   .loot-thumb-btn {{ width:92px; height:56px; padding:0; overflow:hidden; border:1px solid #59451f; background:#090a08; cursor:pointer; }}
   .loot-thumb-btn img {{ width:100%; height:100%; display:block; object-fit:cover; transition:transform .16s ease; }}
+  .loot-thumb-empty {{ display:block; cursor:default; }}
   .loot-thumb-btn:hover,.loot-thumb-btn:focus-visible {{ border-color:var(--gold-bright); outline:none; box-shadow:0 0 0 2px rgba(200,146,42,.18); }}
   .loot-thumb-btn:hover img,.loot-thumb-btn:focus-visible img {{ transform:scale(1.035); }}
   .loot-row strong,.loot-row span {{ display:block; }}
@@ -5631,12 +5758,12 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
 <div id="page-loot" class="page">
   <section class="loot-summary-grid">
     <article><strong>{total_gp_str}</strong><span>Total GP logged</span><small>Realized screenshot evidence</small></article>
-    <article><strong>{total_drops:,}</strong><span>Drop screenshots</span><small>Every row opens its evidence</small></article>
+    <article><strong>{ledger_rows:,}</strong><span>Value events</span><small>{ledger_note}</small></article>
     <article><strong>{fmt_gp(top_value_events[0]['value']) if top_value_events else '—'}</strong><span>Largest value event</span><small>{top_value_events[0]['label'] if top_value_events else 'No parsed event'}</small></article>
   </section>
   <section class="card loot-ledger">
     <div class="loot-ledger-head"><div><span>Screenshot-backed wealth evidence</span><h2>The Drops Behind the Number</h2><p>Pending assemblies stay out of this realized-value ledger.</p></div><div class="loot-sort-controls"><button class="filter-btn active" onclick="sortLoot('value', this)">Highest Value</button><button class="filter-btn" onclick="sortLoot('date', this)">Newest First</button></div></div>
-    <div class="loot-table-head"><span>Drop</span><span>Captured</span><span>Realized value</span></div>
+    <div class="loot-table-head"><span>Event</span><span>Captured</span><span>Realized value</span></div>
     <div class="loot-rows" id="loot-grid"></div>
   </section>
 </div>
@@ -5856,8 +5983,8 @@ function wealthClick(_event, elements) {{
 function fmtWealth(value) {{
   const absolute = Math.abs(value || 0);
   const sign = value < 0 ? '-' : '';
-  if (absolute >= 1e9) return sign + (absolute / 1e9).toFixed(2).replace(/\.00$/, '') + 'B';
-  if (absolute >= 1e6) return sign + (absolute / 1e6).toFixed(1).replace(/\.0$/, '') + 'M';
+  if (absolute >= 1e9) return sign + (absolute / 1e9).toFixed(2).replace(/\\.00$/, '') + 'B';
+  if (absolute >= 1e6) return sign + (absolute / 1e6).toFixed(1).replace(/\\.0$/, '') + 'M';
   if (absolute >= 1e3) return sign + Math.round(absolute / 1e3) + 'K';
   return sign + Math.round(absolute).toLocaleString();
 }}
@@ -6833,7 +6960,9 @@ function filterGallery(reset = true) {{
     const matchCat = activeFilter === 'All'
       || (activeFilter === 'Favorites' && favoritePaths.has(screenshotPath(item)))
       || item.cat === activeFilter;
-    const matchSearch = !search || item.label.toLowerCase().includes(search) || item.cat.toLowerCase().includes(search);
+    // The path still holds the original filename, so a search for a date or
+    // any other part of it keeps working now that the card title is shorter.
+    const matchSearch = !search || item.label.toLowerCase().includes(search) || item.cat.toLowerCase().includes(search) || item.path.toLowerCase().includes(search);
     return matchCat && matchSearch;
   }});
   renderGallery();
@@ -6856,6 +6985,8 @@ function renderGallery() {{
     const div = document.createElement('div');
     div.className = 'gallery-item';
     div.onclick = () => openLightbox(idx);
+    div.tabIndex = 0;
+    div.setAttribute('role', 'button');
     div.innerHTML = `
       <img src="${{item.src}}" alt="${{item.label}}" loading="lazy" onerror="this.style.display='none'">
       <div class="thumb-info">
@@ -6955,17 +7086,17 @@ function fmtPulseNumber(value) {{
   if (value >= 1e9) {{
     const digits = value >= 10e9 ? 0 : 1;
     const scaled = (value / 1e9).toFixed(digits);
-    return (digits ? scaled.replace(/\.?0+$/, '') : scaled) + 'B';
+    return (digits ? scaled.replace(/\\.?0+$/, '') : scaled) + 'B';
   }}
   if (value >= 1e6) {{
     const digits = value >= 10e6 ? 0 : 2;
     const scaled = (value / 1e6).toFixed(digits);
-    return (digits ? scaled.replace(/\.?0+$/, '') : scaled) + 'M';
+    return (digits ? scaled.replace(/\\.?0+$/, '') : scaled) + 'M';
   }}
   if (value >= 1e3) {{
     const digits = value >= 100e3 ? 0 : 1;
     const scaled = (value / 1e3).toFixed(digits);
-    return (digits ? scaled.replace(/\.?0+$/, '') : scaled) + 'K';
+    return (digits ? scaled.replace(/\\.?0+$/, '') : scaled) + 'K';
   }}
   return value.toLocaleString();
 }}
@@ -7121,7 +7252,7 @@ function renderFavBosses() {{
     const eta = s.eta_label || 'Not currently training';
     html += '<div class="rtm-detail-row">'
       + '<div class="rtm-detail-top">'
-      + '<span class="rtm-skill-lg" style="color:' + s.color + '">' + s.skill + '</span>'
+      + '<span class="rtm-skill-lg" style="color:' + (s.text_color || s.color) + '">' + s.skill + '</span>'
       + badge
       + '<span class="rtm-detail-level">Lv ' + s.level + '</span>'
       + '</div>'
@@ -7380,7 +7511,7 @@ function renderLuckDetail(b) {{
   const detail = document.getElementById('luck-detail');
   if (!detail || !b) return;
   const color = luckColor(b);
-  const initials = b.boss.split(/\s+/).map(word => word[0]).join('').slice(0, 2);
+  const initials = b.boss.split(/\\s+/).map(word => word[0]).join('').slice(0, 2);
   const bossImage = LUCK_BOSS_IMAGES[b.boss] || '';
   const bossVisual = bossImage ? '<button class="luck-detail-image" data-luck-boss-image="true" aria-label="Open ' + b.boss + ' screenshot"><img src="' + bossImage + '" alt=""></button>' : '<div class="luck-detail-visual">' + initials + '</div>';
   const owned = b.items.filter(it => it.owned).length;
@@ -7495,21 +7626,45 @@ function sortLoot(key, btn) {{
   renderLoot();
 }}
 
+// Ledger rows in the selected order. Shared by the list and the lightbox so a
+// thumbnail always opens the screenshot it shows.
+function sortedLootRows() {{
+  return [...DROPS].sort((a, b) => lootSortKey === 'value' ? b.value - a.value : (b.ts_iso > a.ts_iso ? 1 : -1));
+}}
+
+function lootRowNote(drop) {{
+  if (drop.kind !== 'assembled') return 'Valuable drop';
+  const count = (drop.shots || []).length;
+  return count ? 'Assembled · ' + count + ' component screenshot' + (count === 1 ? '' : 's') : 'Assembled';
+}}
+
 function renderLoot() {{
   const grid = document.getElementById('loot-grid');
   if (!grid) return;
-  const sorted = [...DROPS].sort((a, b) => lootSortKey === 'value' ? b.value - a.value : (b.ts_iso > a.ts_iso ? 1 : -1));
-  grid.innerHTML = sorted.map((drop, idx) => {{
+  grid.innerHTML = sortedLootRows().map((drop, idx) => {{
     const qty = drop.qty > 1 ? drop.qty + 'x ' : '';
-    return '<article class="loot-row"><div class="loot-row-main"><button type="button" class="loot-thumb-btn" aria-label="Open drop screenshot" onclick="openLootEvidence(' + idx + ')"><img src="' + drop.src + '" alt="" loading="lazy"></button><div><strong>' + qty + drop.item + '</strong><span>Valuable drop screenshot</span></div></div>'
+    const thumb = drop.src
+      ? '<button type="button" class="loot-thumb-btn" aria-label="Open screenshot" onclick="openLootEvidence(' + idx + ')"><img src="' + drop.src + '" alt="" loading="lazy"></button>'
+      : '<span class="loot-thumb-btn loot-thumb-empty"></span>';
+    return '<article class="loot-row"><div class="loot-row-main">' + thumb + '<div><strong>' + qty + drop.item + '</strong><span>' + lootRowNote(drop) + '</span></div></div>'
       + '<span>' + drop.ts + '</span><span class="loot-row-value">' + fmtGP(drop.value) + ' gp</span></article>';
   }}).join('');
 }}
 
 function openLootEvidence(idx) {{
-  const sorted = [...DROPS].sort((a, b) => lootSortKey === 'value' ? b.value - a.value : (b.ts_iso > a.ts_iso ? 1 : -1));
-  lbItems = sorted.map(d => ({{src: d.src, label: (d.qty > 1 ? d.qty + 'x ' : '') + d.item, ts: d.ts}}));
-  lbIndex = idx;
+  // One lightbox run over every row's evidence: a drop contributes its
+  // screenshot, an assembly contributes each component screenshot.
+  const rows = sortedLootRows();
+  const items = [];
+  let start = 0;
+  rows.forEach((d, rowIndex) => {{
+    if (rowIndex === idx) start = items.length;
+    const name = (d.qty > 1 ? d.qty + 'x ' : '') + d.item;
+    if (d.kind === 'assembled') (d.shots || []).forEach(shot => items.push({{src: shot.src, label: name + (shot.label ? ' · ' + shot.label : ''), ts: d.ts}}));
+    else if (d.src) items.push({{src: d.src, label: name, ts: d.ts}});
+  }});
+  lbItems = items;
+  lbIndex = start;
   showLb();
   document.getElementById('lightbox').classList.add('open');
 }}
@@ -7536,7 +7691,9 @@ function openHofItem(idx) {{
 let BOSS_DATA = [];
 try {{ BOSS_DATA = {boss_cards_json}; }} catch(e) {{ console.error('Boss data parse error:', e); }}
 let bossRendered = false;
-let selectedBossIndex = 0;
+// -1 means nothing chosen yet: the directory then selects the first real boss
+// in the current order.
+let selectedBossIndex = -1;
 let bossCategory = 'All';
 let bossSortMode = 'evidence';
 const BOSS_SHOT_ITEMS = [];
@@ -7576,8 +7733,13 @@ function renderBosses() {{
 
 function sortBosses(mode, btn) {{
   bossSortMode = mode;
+  // A new order is a new question, so the detail panel follows it to the top
+  // row instead of staying on a boss that may now be far down the list.
+  selectedBossIndex = -1;
   document.querySelectorAll('[data-boss-sort]').forEach(item => item.classList.toggle('active', item === btn));
   renderBossDirectory();
+  const grid = document.getElementById('boss-grid');
+  if (grid) grid.scrollTop = 0;
 }}
 
 // Each sort falls through to the next most useful order on a tie. Rank is
@@ -7601,10 +7763,10 @@ function renderBossDirectory() {{
   let rows = BOSS_DATA.map((boss, index) => ({{boss, index}})).filter(item => (bossCategory === 'All' || item.boss.category === bossCategory) && (!search || item.boss.boss.toLowerCase().includes(search)));
   rows.sort((a, b) => compareBosses(a.boss, b.boss));
   if (!rows.length) {{ grid.innerHTML = '<p class="empty-note">No bosses match this view.</p>'; return; }}
-  if (!rows.some(item => item.index === selectedBossIndex)) selectedBossIndex = rows[0].index;
+  if (!rows.some(item => item.index === selectedBossIndex)) selectedBossIndex = (rows.find(item => !item.boss.virtual) || rows[0]).index;
   grid.innerHTML = rows.map(item => {{
     const b = item.boss;
-    const initials = b.boss.split(/\s+/).map(word => word[0]).join('').slice(0, 2);
+    const initials = b.boss.split(/\\s+/).map(word => word[0]).join('').slice(0, 2);
     const visual = b.representative ? '<img src="' + b.representative + '" alt="" loading="lazy">' : '<span class="boss-card-monogram">' + initials + '</span>';
     return '<button class="boss-directory-card ' + (item.index === selectedBossIndex ? 'active' : '') + '" data-boss-index="' + item.index + '" onclick="selectBoss(' + item.index + ')">' + visual
       + '<span><strong>' + b.boss + '</strong><span>' + b.category + (b.kc ? ' · ' + b.kc.toLocaleString() + ' KC' : '') + '</span>'
@@ -7631,10 +7793,10 @@ function selectBoss(idx, rerender = true) {{
     }}).join('');
     evidenceHtml += '<section class="boss-evidence-section"><h3>' + section[0] + '</h3><div class="boss-evidence-grid">' + cards + '</div></section>';
   }});
-  const initials = b.boss.split(/\s+/).map(word => word[0]).join('').slice(0, 2);
+  const initials = b.boss.split(/\\s+/).map(word => word[0]).join('').slice(0, 2);
   const representativeIndex = Math.max(0, BOSS_SHOT_ITEMS.findIndex(item => item.src === b.representative));
   const visual = b.representative ? '<button class="boss-hero-shot" onclick="openBossIdx(' + representativeIndex + ')" aria-label="Open ' + b.boss + ' screenshots"><img src="' + b.representative + '" alt=""></button>' : '<div class="boss-detail-monogram">' + initials + '</div>';
-  document.getElementById('boss-detail-panel').innerHTML = '<div class="boss-detail-hero-new">' + visual + '<div><h2>' + b.boss + '</h2><p>' + (b.kc ? b.kc.toLocaleString() + ' tracked kills' : 'KC unavailable') + (b.rank ? ' · Hiscores rank ' + b.rank.toLocaleString() : '') + ' · ' + b.category + '</p><p>' + (b.gp_str ? b.gp_str + ' realized value logged' : 'No realized GP attributed') + '</p></div></div>'
+  document.getElementById('boss-detail-panel').innerHTML = '<div class="boss-detail-hero-new">' + visual + '<div><h2>' + b.boss + '</h2><p>' + (b.kc ? b.kc.toLocaleString() + ' tracked kills' : (b.virtual ? 'Drops shared between bosses' : 'KC unavailable')) + (b.rank ? ' · Hiscores rank ' + b.rank.toLocaleString() : '') + ' · ' + b.category + '</p><p>' + (b.gp_str ? b.gp_str + ' realized value logged' : 'No realized GP attributed') + '</p></div></div>'
     + '<div class="boss-evidence-stats"><div><strong>' + b.evidence_count + '</strong><span>Evidence items</span></div><div><strong>' + b.drops.length + '</strong><span>Valuable drops</span></div><div><strong>' + (b.ca_captured || 0) + (b.ca_total ? ' / ' + b.ca_total : '') + '</strong><span>CA screenshots / Wiki tasks</span></div></div>'
     + (evidenceHtml || '<p class="empty-note">No screenshots captured for this boss yet.</p>');
 }}
@@ -7664,7 +7826,7 @@ function renderMemoryWeek() {{
   const start = memoryPageIndex * MEMORY_PAGE_SIZE;
   const pageItems = THIS_WEEK_MEMORIES.slice(start, start + MEMORY_PAGE_SIZE);
   grid.innerHTML = pageItems.map(function(memory) {{
-    return '<div class="memory-card" onclick="openMemoryItem(' + memory.idx + ')">'
+    return '<div class="memory-card" tabindex="0" role="button" onclick="openMemoryItem(' + memory.idx + ')">'
       + '<img src="' + memory.src + '" alt="" loading="lazy">'
       + '<div class="memory-card-body">'
       + '<div class="memory-card-top"><span class="memory-badge" style="color:' + memory.color + '">'
@@ -7798,7 +7960,21 @@ function closeNavigation() {{
   document.getElementById('nav-scrim').classList.remove('open');
 }}
 
-function switchPage(id, btn) {{
+// The open page is kept in the address bar as #bosses, #loot and so on. That
+// is what lets the browser's Back and Forward buttons move between pages, and
+// what brings a reload, including the one that follows Refresh, back to the
+// page that was open instead of to Stats. Only the fragment changes, so it
+// works the same from the local service and from the file opened directly.
+let currentPageId = 'stats';
+
+function pageIdFromAddress() {{
+  const id = window.location.hash.slice(1);
+  return PAGE_HEADINGS[id] && document.getElementById('page-' + id) ? id : '';
+}}
+
+function switchPage(id, btn, fromHistory) {{
+  const changed = id !== currentPageId;
+  currentPageId = id;
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
   document.getElementById('page-' + id).classList.add('active');
@@ -7813,20 +7989,40 @@ function switchPage(id, btn) {{
   if (id === 'loot') renderLoot();
   if (id === 'bosses') renderBosses();
   if (id === 'chronicle') renderChronicle();
+  if (changed && !fromHistory) {{
+    try {{ history.pushState(null, '', '#' + id); }}
+    catch (error) {{ window.location.hash = id; }}
+  }}
 }}
 
-function goToPage(id) {{
+function goToPage(id, fromHistory) {{
   const btn = Array.from(document.querySelectorAll('#side-rail .nav-item')).find(item => item.getAttribute('onclick').includes("'" + id + "'"));
-  if (btn) switchPage(id, btn);
+  if (btn) switchPage(id, btn, fromHistory);
 }}
+
+window.addEventListener('hashchange', () => {{
+  const id = pageIdFromAddress() || 'stats';
+  if (id !== currentPageId) goToPage(id, true);
+}});
 
 document.addEventListener('keydown', event => {{
   if (event.key === 'Escape') closeNavigation();
 }});
 
+// Screenshot cards are built as plain blocks, so the keyboard needs telling
+// that Enter and Space open them the way a click does.
+document.addEventListener('keydown', event => {{
+  if (event.key !== 'Enter' && event.key !== ' ') return;
+  const card = event.target;
+  if (!card.matches || !card.matches('.gallery-item, .memory-card, .hof-item[role="button"]')) return;
+  event.preventDefault();
+  card.click();
+}});
+
 // Initialize the static gallery immediately, then enable durable interaction
 // when the private local service is available.
 initializeDashboardApp();
+if (pageIdFromAddress() && pageIdFromAddress() !== currentPageId) goToPage(pageIdFromAddress(), true);
 </script>
 </body>
 </html>"""
