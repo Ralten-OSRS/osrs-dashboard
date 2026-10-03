@@ -132,10 +132,13 @@ def _boss_refresh_progress(position, total, boss):
     """Print one line per boss during a forced refresh so it never looks hung."""
     print(f"  [{position}/{total}] {boss}")
 
-# Road to Max forecasting uses a rolling two-week window: responsive enough
-# to follow a real playstyle change, but less volatile than a single week.
+# Road to Max keeps two different clocks on purpose. Recent pace stays
+# responsive to the current grind, while the headline forecast uses eight
+# weeks of actual XP-to-max reduction so changing skills does not rewrite the
+# account's likely finish date every few days.
 PACE_WINDOW_DAYS = 14
-PACE_EARLY_MIN_DAYS = 7
+MAX_FORECAST_WINDOW_DAYS = 56
+MAX_FORECAST_MIN_DAYS = 28
 ETA_USEFUL_MAX_DAYS = 365 * 3
 ACTIVE_XP_FLOOR = 100_000
 
@@ -426,6 +429,63 @@ def compute_pace(history, window_days=PACE_WINDOW_DAYS):
     return rates, span
 
 
+def compute_max_forecast(history, window_days=MAX_FORECAST_WINDOW_DAYS,
+                         min_span_days=MAX_FORECAST_MIN_DAYS):
+    """Stable account-level max forecast from reduction in XP still needed.
+
+    The baseline is the snapshot nearest the requested horizon, subject to a
+    minimum useful span. Capping every skill at MAX_XP means post-99 XP cannot
+    make the account appear closer to max, while skills completed during the
+    window still contribute their final progress. The ETA is anchored to the
+    latest snapshot date so an offline rebuild cannot slide the forecast.
+    """
+    valid = []
+    for entry in history:
+        try:
+            entry_dt = datetime.strptime(entry["date"], "%Y-%m-%d")
+        except (KeyError, TypeError, ValueError):
+            continue
+        if isinstance(entry.get("xp"), dict):
+            valid.append((entry_dt, entry))
+    if len(valid) < 2:
+        return {"rate": 0, "span": 0, "remaining": 0,
+                "progress": 0, "eta_days": None, "eta_date": None}
+
+    valid.sort(key=lambda item: item[0])
+    latest_dt, latest = valid[-1]
+    candidates = []
+    for entry_dt, entry in valid[:-1]:
+        span = (latest_dt - entry_dt).days
+        if span >= min_span_days:
+            candidates.append((abs(span - window_days), -span, span, entry))
+
+    remaining_now = sum(
+        max(MAX_XP - int(xp), 0)
+        for xp in latest.get("xp", {}).values()
+        if isinstance(xp, (int, float))
+    )
+    if not candidates:
+        available_span = max((latest_dt - item[0]).days for item in valid[:-1])
+        return {"rate": 0, "span": available_span, "remaining": remaining_now,
+                "progress": 0, "eta_days": None, "eta_date": None}
+
+    _, _, span, baseline = min(candidates, key=lambda item: (item[0], item[1]))
+    progress = 0
+    for skill, xp_now in latest.get("xp", {}).items():
+        xp_then = baseline.get("xp", {}).get(skill)
+        if not isinstance(xp_now, (int, float)) or not isinstance(xp_then, (int, float)):
+            continue
+        before = max(MAX_XP - int(xp_then), 0)
+        after = max(MAX_XP - int(xp_now), 0)
+        progress += max(before - after, 0)
+
+    rate = progress / span if progress > 0 and span > 0 else 0
+    eta_days = int(remaining_now / rate + 0.5) if remaining_now and rate else None
+    eta_date = latest_dt + timedelta(days=eta_days) if eta_days is not None else None
+    return {"rate": rate, "span": span, "remaining": remaining_now,
+            "progress": progress, "eta_days": eta_days, "eta_date": eta_date}
+
+
 def compute_account_pulse(history, window_days):
     """Summarize measurable account movement inside a recent time window.
 
@@ -505,16 +565,22 @@ def compute_account_pulse(history, window_days):
     if baseline_clues is not None and latest_clues is not None:
         clue_gain = max(int(latest_clues) - int(baseline_clues), 0)
 
-    if total_xp and focus_share >= 60:
-        verdict = f"{focus_skill} defined the last {span_days} days."
-    elif total_xp and boss_kills:
-        verdict = "A balanced stretch of skilling and bossing."
+    if total_xp:
+        focus_label = (f"{focus_gain / 1_000_000:.2f}M" if focus_gain >= 1_000_000
+                       else f"{focus_gain / 1_000:.0f}K" if focus_gain >= 1_000
+                       else f"{focus_gain:,}")
+        if focus_share >= 70:
+            verdict = f"{focus_skill} drove {focus_label} XP."
+        elif len(top_skills) > 1:
+            verdict = f"{focus_skill} led with {focus_label} XP; {top_skills[1][0]} followed."
+        else:
+            verdict = f"{focus_skill} gained {focus_label} XP."
     elif boss_kills:
-        verdict = f"Bossing defined the last {span_days} days."
-    elif total_xp:
-        verdict = "Progress was spread across the account."
-    elif (clog_gain or 0) + (clue_gain or 0) > 0:
-        verdict = "Quiet gains, but the account still moved."
+        verdict = f"{top_bosses[0][0]} led bossing with {top_bosses[0][1]:,} kills."
+    elif clog_gain:
+        verdict = f"{clog_gain} collection log slot{'s' if clog_gain != 1 else ''} added."
+    elif clue_gain:
+        verdict = f"{clue_gain} clue{'s' if clue_gain != 1 else ''} completed."
     else:
         verdict = "No measurable gains in this window yet."
 
@@ -1364,7 +1430,8 @@ HOME_MOMENT_CATEGORIES = {
 HOME_MOMENT_WINDOW_DAYS = 90
 
 
-def select_home_moments(gallery_items, limit=5):
+def select_home_moments(gallery_items, limit=5, window_days=HOME_MOMENT_WINDOW_DAYS,
+                        reference_date=None):
     """Choose a current, varied set of screenshot-backed account moments.
 
     Selection stays deterministic and local: recency supplies the base score,
@@ -1379,12 +1446,13 @@ def select_home_moments(gallery_items, limit=5):
     if not candidates or limit <= 0:
         return []
 
-    newest = max(item["timestamp"] for item in candidates)
+    newest = reference_date or max(item["timestamp"] for item in candidates)
     recent = [
         item for item in candidates
-        if (newest - item["timestamp"]).days <= HOME_MOMENT_WINDOW_DAYS
+        if 0 <= (newest - item["timestamp"]).days <= window_days
     ]
     pool = recent if len(recent) >= limit else candidates
+    recent_paths = {item.get("rel_path") for item in recent}
 
     def significance(item):
         category = item["category"]
@@ -1421,7 +1489,8 @@ def select_home_moments(gallery_items, limit=5):
     ranked = sorted(
         pool,
         key=lambda item: (
-            max(0, HOME_MOMENT_WINDOW_DAYS - (newest - item["timestamp"]).days) * 2
+            1000 if item.get("rel_path") in recent_paths else 0,
+            max(0, window_days - (newest - item["timestamp"]).days) * 2
             + significance(item),
             item["timestamp"],
             item.get("rel_path", ""),
@@ -1432,24 +1501,33 @@ def select_home_moments(gallery_items, limit=5):
     selected = []
     selected_paths = set()
     category_counts = defaultdict(int)
-    for item in ranked:
-        path = item.get("rel_path")
-        if path in selected_paths or category_counts[item["category"]] >= 1:
-            continue
-        selected.append(item)
-        selected_paths.add(path)
-        category_counts[item["category"]] += 1
-        if len(selected) == limit:
+    # A month view should surface some moments outside the current week when
+    # they exist; otherwise both controls can show the exact same five tiles.
+    if window_days == 30:
+        earlier = [item for item in ranked
+                   if 7 < (newest - item["timestamp"]).days <= 30]
+        for item in earlier:
+            if category_counts[item["category"]]:
+                continue
+            selected.append(item)
+            selected_paths.add(item.get("rel_path"))
+            category_counts[item["category"]] += 1
+            if len(selected) == min(2, limit):
+                break
+        if len(selected) >= limit:
             return selected
-
-    for item in ranked:
-        path = item.get("rel_path")
-        if path in selected_paths:
-            continue
-        selected.append(item)
-        selected_paths.add(path)
-        if len(selected) == limit:
-            break
+    for group in ([item for item in ranked if item.get("rel_path") in recent_paths],
+                  [item for item in ranked if item.get("rel_path") not in recent_paths]):
+        for distinct_categories in (True, False):
+            for item in group:
+                path = item.get("rel_path")
+                if path in selected_paths or (distinct_categories and category_counts[item["category"]]):
+                    continue
+                selected.append(item)
+                selected_paths.add(path)
+                category_counts[item["category"]] += 1
+                if len(selected) == limit:
+                    return selected
     return selected
 
 
@@ -2290,30 +2368,28 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
     road_to_max.sort(key=_rtm_sort_key)
     road_to_max_json = road_to_max
 
-    # Headline projections for the Road to Max tab
+    # Recent pace describes the current grind. The headline forecast is a
+    # separate, steadier account-level measure so a fast Hunter week is not
+    # silently applied to every slower skill still remaining.
     total_rate = sum(qualified_max_progress_rates.values())
+    max_forecast = compute_max_forecast(xp_history)
+    forecast_span = max_forecast["span"]
     max_eta_str = ""
     max_eta_label = "Building History"
-    if total_xp_remaining and total_rate > 0 and pace_span >= PACE_EARLY_MIN_DAYS:
-        max_days = int(total_xp_remaining / total_rate + 0.5)
-        max_eta_str = (datetime.now() + timedelta(days=max_days)).strftime("%B %Y")
-        max_eta_label = "Projected Max" if pace_span >= PACE_WINDOW_DAYS else "Early Estimate"
+    if (max_forecast["eta_date"] is not None
+            and max_forecast["eta_days"] <= ETA_USEFUL_MAX_DAYS):
+        max_eta_str = max_forecast["eta_date"].strftime("%B %Y")
+        max_eta_label = ("Projected Max" if forecast_span >= MAX_FORECAST_WINDOW_DAYS
+                         else "Early Estimate")
+    elif forecast_span >= MAX_FORECAST_MIN_DAYS:
+        max_eta_label = "No stable projection"
     pace_headline = fmt_gp(int(total_rate)) if total_rate > 0 else "—"
+    pace_card_label = f"{pace_span}-day recent pace" if pace_span else "Recent XP / day"
+    forecast_card_label = (
+        f"{max_eta_label} · {forecast_span}-day trend"
+        if forecast_span else max_eta_label
+    )
     total_xp_rem_str = fmt_gp(total_xp_remaining) if total_xp_remaining else "—"
-    if qualified_max_progress_rates and pace_span < PACE_EARLY_MIN_DAYS:
-        pace_note_html = f'<p class="rtm-pace-note">Pace measured over the last {pace_span} days. The max forecast unlocks at 7 days and settles into a rolling 14-day view.</p>'
-    elif qualified_max_progress_rates and pace_span < PACE_WINDOW_DAYS:
-        pace_note_html = f'<p class="rtm-pace-note">Early estimate from {pace_span} days of XP snapshots. It becomes the rolling 14-day projection as history fills in.</p>'
-    elif qualified_max_progress_rates:
-        pace_note_html = f'<p class="rtm-pace-note">Projection uses the most recent {pace_span} days inside the rolling 14-day window. ETAs assume that recent pace holds.</p>'
-    elif max_progress_rates:
-        max_eta_label = "No recent max progress"
-        pace_note_html = f'<p class="rtm-pace-note">Recent XP in unmaxed skills was too small to treat as an active maxing pace.</p>'
-    elif pace_rates:
-        max_eta_label = "No recent max progress"
-        pace_note_html = f'<p class="rtm-pace-note">Recent XP was earned only in already-maxed skills, so it does not move the max projection.</p>'
-    else:
-        pace_note_html = '<p class="rtm-pace-note">Pace tracking builds automatically. Refresh on different days to establish a recent trajectory; the max forecast unlocks at 7 days.</p>'
     # Daily XP gained — the road-to-max story is velocity, not the near-flat
     # cumulative total (which is so large that a strong session barely nudges
     # the line and every axis label rounds to the same "409M"). Each bar is
@@ -2375,10 +2451,10 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
         for i, p in enumerate(pets_sorted):
             date_str = p["timestamp"].strftime("%b %d, %Y") if p["timestamp"] else ""
             pets_json_data.append({"src": p["rel_path"], "ts": date_str, "label": "Pet drop #" + str(i + 1)})
-            pet_html += ('<div class="pet-thumb" onclick="openPetItem(' + str(i) + ')">'
+            pet_html += ('<button type="button" class="pet-thumb" onclick="openPetItem(' + str(i) + ')" aria-label="Open pet screenshot from ' + date_str + '">'
                          + '<img src="' + p["rel_path"] + '" alt="" loading="lazy">'
                          + '<div class="pet-thumb-date">' + date_str + '</div>'
-                         + '</div>')
+                         + '</button>')
     else:
         pet_html = '<p class="empty-note">No pet screenshots found yet.</p>'
     pets_json = json.dumps(pets_json_data)
@@ -2830,31 +2906,29 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
 
     # Homepage cover moments: rank recent evidence by recency and account-story
     # significance, then preserve category variety. Every tile opens its source.
-    home_moments = []
-    for _moment in select_home_moments(data["gallery_items"]):
-        _category = _moment["category"]
-        _label = Path(_moment["filename"]).stem
-        if _category == "Level-Ups":
-            _skill, _level = parse_level_up(_moment["filename"])
-            if _skill and _level:
-                _label = f"{_skill} level {_level}"
-        elif _category == "Quests":
-            _label = parse_quest_name(_moment["filename"]) or _label
-        home_moments.append({
-            "src": _moment["rel_path"],
-            "label": _label,
-            "category": _category,
-            "ts": _moment["timestamp"].strftime("%b %d, %Y"),
-        })
-    home_moments_json = json.dumps(home_moments)
-    home_moments_html = "".join(
-        '<button class="home-moment' + (' home-moment-featured' if i == 0 else '')
-        + '" onclick="openHomeMoment(' + str(i) + ')" aria-label="Open ' + moment["category"] + ' screenshot">'
-        + '<img src="' + moment["src"] + '" alt="" loading="' + ('eager' if i == 0 else 'lazy') + '">'
-        + '<span><small>' + moment["category"] + '</small><strong>' + moment["label"] + '</strong><em>' + moment["ts"] + '</em></span>'
-        + '</button>'
-        for i, moment in enumerate(home_moments)
-    )
+    home_moments_by_window = {}
+    home_reference_date = datetime.now()
+    for _days in (7, 30):
+        home_moments = []
+        for _moment in select_home_moments(data["gallery_items"], window_days=_days,
+                                           reference_date=home_reference_date):
+            _category = _moment["category"]
+            _label = Path(_moment["filename"]).stem
+            if _category == "Level-Ups":
+                _skill, _level = parse_level_up(_moment["filename"])
+                if _skill and _level:
+                    _label = f"{_skill} level {_level}"
+            elif _category == "Quests":
+                _label = parse_quest_name(_moment["filename"]) or _label
+            home_moments.append({
+                "src": _moment["rel_path"],
+                "label": _label,
+                "category": _category,
+                "ts": _moment["timestamp"].strftime("%b %d, %Y"),
+                "in_window": 0 <= (home_reference_date - _moment["timestamp"]).days <= _days,
+            })
+        home_moments_by_window[str(_days)] = home_moments
+    home_moments_json = json.dumps(home_moments_by_window)
 
     # Screenshot-backed account journey. Dates are taken only from parsed
     # RuneLite filenames; gaps are inferred later between observed levels and
@@ -3747,6 +3821,9 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   }}
   .pet-thumb {{
     width: 90px;
+    padding: 0;
+    color: inherit;
+    font: inherit;
     cursor: pointer;
     border: 1px solid var(--border);
     background: var(--bg);
@@ -3754,6 +3831,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
     transition: border-color 0.15s;
   }}
   .pet-thumb:hover {{ border-color: var(--gold); }}
+  .pet-thumb:focus-visible {{ outline: 2px solid var(--gold-bright); outline-offset: 2px; }}
   .pet-thumb img {{
     width: 100%;
     height: 70px;
@@ -4993,9 +5071,8 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   .home-activity-card canvas {{ max-height:190px; }}
   .stats-story-row {{ order:8; margin:0 !important; }}
   .stats-pets-card,.stats-value-card,.stats-hof-card {{ padding:15px 16px !important; }}
-  #page-stats .stats-pets-card .pet-thumb-grid {{ display:grid; grid-template-columns:repeat(5,1fr); gap:8px; }}
+  #page-stats .stats-pets-card .pet-thumb-grid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(92px,1fr)); gap:8px; }}
   #page-stats .stats-pets-card .pet-thumb {{ width:auto; min-width:0; }}
-  #page-stats .stats-pets-card .pet-thumb:nth-child(n+6) {{ display:none; }}
   #page-stats .stats-pets-card .pet-thumb img {{ height:92px; }}
   .stats-hof-card {{ order:9; }}
   .stats-hof-card .hof-grid {{ grid-template-columns:repeat(4,1fr); }}
@@ -5024,11 +5101,13 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   .journey-controls button,.boss-category-tabs button,.boss-controls button {{ height:30px; padding:0 9px; border:1px solid var(--border-bright); background:#0d0e0b; color:#c8bfae; cursor:pointer; font:600 8px 'Cinzel',serif; text-transform:uppercase; }}
   .journey-controls button:hover,.journey-controls button.active,.boss-category-tabs button:hover,.boss-category-tabs button.active,.boss-controls button:hover {{ color:var(--gold-bright); border-color:var(--gold); background:#2a210d; }}
   .journey-focus-shell {{ overflow:auto; padding-top:11px; }}
-  #journey-focus-map {{ min-width:760px; }}
+  #journey-focus-map {{ width:max(100%,var(--journey-min-width,760px)); min-width:760px; }}
   .journey-axis,.journey-focus-row {{ width:100%; box-sizing:border-box; display:grid; grid-template-columns:100px repeat(var(--month-count),minmax(18px,1fr)); gap:3px; align-items:center; }}
   .journey-axis {{ margin-bottom:5px; }}
   .journey-axis span {{ color:var(--text-dim); font:9px 'Segoe UI',Arial,sans-serif; text-align:center; }}
-  .journey-axis strong,.journey-focus-row > strong {{ color:var(--text); font:600 9px 'Cinzel',serif; }}
+  .journey-axis strong,.journey-skill-pick {{ color:var(--text); font:600 9px 'Cinzel',serif; }}
+  .journey-skill-pick {{ padding:0; border:0; background:none; cursor:pointer; text-align:left; }}
+  .journey-skill-pick:hover,.journey-skill-pick:focus-visible {{ color:var(--gold-bright); text-decoration:underline; }}
   .journey-focus-row {{ min-height:26px; border-bottom:1px solid #2e291d; }}
   .journey-cell {{ height:16px; border:1px solid transparent; background:#11110d; }}
   button.journey-cell {{ cursor:pointer; background:var(--skill-color); border-color:color-mix(in srgb,var(--skill-color) 70%,#fff 15%); box-shadow:0 0 5px color-mix(in srgb,var(--skill-color) 40%,transparent); }}
@@ -5037,11 +5116,18 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   .skill-journey-heading > div > span {{ color:var(--gold); font:600 8px 'Cinzel',serif; text-transform:uppercase; }}
   .skill-journey-heading label {{ color:#c8bfae; font:10px 'Segoe UI',Arial,sans-serif; }}
   .skill-journey-heading select {{ margin-left:7px; height:30px; min-width:145px; border:1px solid var(--border-bright); background:#0d0e0b; color:var(--gold-bright); }}
-  #journey-sequence {{ display:flex; gap:8px; overflow:auto; padding:18px 2px 8px; }}
-  .journey-level,.journey-gap {{ flex:none; text-align:center; }}
-  .journey-level button {{ width:42px; height:42px; border-radius:50%; border:1px solid var(--gold); background:#b98c24; color:#0d0d09; cursor:pointer; font:600 13px 'Cinzel',serif; }}
-  .journey-level span {{ display:block; margin-bottom:4px; color:#c8bfae; font:9px 'Segoe UI',Arial,sans-serif; }}
-  .journey-gap {{ min-width:92px; height:42px; margin-top:16px; display:grid; place-items:center; border:1px dashed var(--gold-dim); color:#c8bfae; font:9px 'Segoe UI',Arial,sans-serif; }}
+  .journey-sequence-meta {{ margin:8px 0 12px; color:#c8bfae; font:11px 'Segoe UI',Arial,sans-serif; }}
+  #journey-sequence {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(165px,1fr)); gap:10px; }}
+  .journey-level {{ min-width:0; }}
+  .journey-level button {{ display:block; width:100%; padding:0; border:1px solid var(--border-bright); background:#0d0e0b; color:var(--text); cursor:pointer; text-align:left; }}
+  .journey-level button:hover,.journey-level button:focus-visible {{ border-color:var(--gold); outline:none; }}
+  .journey-level img {{ display:block; width:100%; height:105px; object-fit:cover; }}
+  .journey-level-caption {{ display:flex; justify-content:space-between; gap:8px; padding:9px; }}
+  .journey-level-caption strong {{ color:var(--gold-bright); font:600 10px 'Cinzel',serif; }}
+  .journey-level-caption span {{ color:#c8bfae; font:10px 'Segoe UI',Arial,sans-serif; text-align:right; }}
+  .journey-more {{ display:block; margin:12px auto 0; padding:9px 16px; border:1px solid var(--border-bright); background:#1c160a; color:var(--gold-bright); cursor:pointer; font:600 9px 'Cinzel',serif; }}
+  .journey-more[hidden] {{ display:none; }}
+  .journey-more:hover {{ border-color:var(--gold); }}
 
   /* Bosses */
   .boss-summary-grid {{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }}
@@ -5164,8 +5250,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
     .home-clue-ledger {{ grid-template-columns:1fr 1fr; }}
     .home-clue-ledger div:nth-child(2) {{ border-right:0; }}
     .home-clue-ledger div:nth-child(-n+2) {{ border-bottom:1px solid #49391c; }}
-    #page-stats .stats-pets-card .pet-thumb-grid {{ grid-template-columns:1fr 1fr; }}
-    #page-stats .stats-pets-card .pet-thumb:nth-child(5) {{ display:none; }}
+    #page-stats .stats-pets-card .pet-thumb-grid {{ grid-template-columns:repeat(auto-fit,minmax(110px,1fr)); }}
     #rtm-detail {{ grid-template-columns:1fr; }}
     .journey-toolbar,.skill-journey-heading,.boss-directory-head,.loot-ledger-head {{ display:block; }}
     .journey-controls,.boss-controls,.loot-sort-controls {{ margin-top:10px; }}
@@ -5290,7 +5375,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
       </div>
       <div class="home-cover-foot"><span>{data["total"]:,} captured moments</span><span>{years_played}</span></div>
     </div>
-    <div class="home-moment-grid">{home_moments_html}</div>
+    <div class="home-moment-grid" id="home-moment-grid"></div>
   </section>
 
   <section class="card home-momentum-card">
@@ -5311,7 +5396,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
     <article class="card home-next-card">
       <div class="home-section-head"><div><span>The road ahead</span><h2>Next Chapter</h2></div></div>
       <div class="home-next-number">{total_xp_rem_str}</div><p>XP remains across {len(road_to_max)} skills.</p>
-      <div class="home-next-stats"><div><strong>{pace_headline}</strong><span>Current pace</span></div><div><strong>{max_eta_str or "—"}</strong><span>{max_eta_label}</span></div></div>
+      <div class="home-next-stats"><div><strong>{pace_headline}</strong><span>Recent pace</span></div><div><strong>{max_eta_str or "—"}</strong><span>{max_eta_label}</span></div></div>
       <button class="home-text-link" onclick="goToPage('max')">See every remaining skill →</button>
     </article>
     <article class="card home-clue-card">
@@ -5367,7 +5452,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
 
   <div class="grid-2 stats-story-row" style="margin-bottom:24px">
     <div class="card stats-pets-card">
-      <div class="home-section-head"><div><span>Companions collected</span><h2>Pet Archive</h2></div><button class="home-text-link" onclick="openPetItem(0)">View all pets →</button></div>
+      <div class="home-section-head"><div><span>Companions collected</span><h2>Pet Archive</h2></div><button class="home-text-link" onclick="openPetItem(0)">Browse pets →</button></div>
       <div class="pet-thumb-grid">{pet_html}</div>
     </div>
     <div class="card stats-value-card">
@@ -5387,11 +5472,11 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   <section class="journey-summary-grid">
     <article class="journey-summary-card"><span>XP</span><div><strong>{total_xp_rem_str}</strong><small>XP to max</small></div></article>
     <article class="journey-summary-card"><span>Skills</span><div><strong>{len(road_to_max)}</strong><small>Skills left</small></div></article>
-    <article class="journey-summary-card"><span>Pace</span><div><strong>{pace_headline}</strong><small>XP per day</small></div></article>
-    <article class="journey-summary-card"><span>ETA</span><div><strong>{max_eta_str or "—"}</strong><small>{max_eta_label}</small></div></article>
+    <article class="journey-summary-card"><span>Pace</span><div><strong>{pace_headline}</strong><small>{pace_card_label}</small></div></article>
+    <article class="journey-summary-card"><span>ETA</span><div><strong>{max_eta_str or "—"}</strong><small>{forecast_card_label}</small></div></article>
   </section>
   <section class="card journey-road-card">
-    <div class="section-heading"><div><h2>Road to Max</h2><p>Current hiscores, recent pace, and XP-based progress.</p></div><span>Current hiscores snapshot</span></div>
+    <div class="section-heading"><div><h2>Road to Max</h2><p>Current hiscores, recent momentum, and a steadier eight-week max projection.</p></div><span>Current hiscores snapshot</span></div>
     <div class="journey-road-layout"><div id="rtm-detail"></div><div class="journey-xp-panel"><h3>Daily XP Gained</h3><canvas id="xpTrendChart" height="160"></canvas><p class="empty-note" id="xp-trend-note" style="display:none">No trend to draw yet — a gain bar appears once you've refreshed on two different days.</p></div></div>
   </section>
   <section class="card account-journey-card">
@@ -5400,8 +5485,10 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
     <div class="journey-coverage" id="journey-coverage"></div>
   </section>
   <section class="card skill-journey-card">
-    <div class="skill-journey-heading"><div><span>Screenshot-backed drilldown</span><h2 id="journey-skill-title">Skill Journey</h2></div><label>Skill <select id="journey-skill-select"></select></label></div>
+    <div class="skill-journey-heading"><div><span>Screenshot-backed drilldown</span><h2 id="journey-skill-title">Captured Level-Ups</h2></div><label>Skill <select id="journey-skill-select"></select></label></div>
+    <p class="journey-sequence-meta" id="journey-sequence-meta"></p>
     <div id="journey-sequence"></div>
+    <button class="journey-more" id="journey-more" type="button" hidden>Show more level-ups</button>
   </section>
 </div>
 
@@ -5866,7 +5953,8 @@ renderWealthProgression('ytd');
 
 // ── Gallery ──────────────────────────────────────────────────────────
 const GALLERY = {json.dumps(gallery_json)};
-const HOME_MOMENTS = {home_moments_json};
+const HOME_MOMENTS_BY_WINDOW = {home_moments_json};
+let HOME_MOMENTS = [];
 let activeFilter = 'All';
 let activeItems = [];
 let lbItems = [];  // what the lightbox is currently browsing
@@ -5885,6 +5973,40 @@ function openHomeMoment(idx) {{
   lbIndex = idx;
   showLb();
   document.getElementById('lightbox').classList.add('open');
+}}
+
+function renderHomeMoments(days) {{
+  const grid = document.getElementById('home-moment-grid');
+  if (!grid) return;
+  HOME_MOMENTS = HOME_MOMENTS_BY_WINDOW[String(days)] || [];
+  grid.replaceChildren();
+  if (!HOME_MOMENTS.length) {{
+    const empty = document.createElement('p');
+    empty.className = 'empty-note';
+    empty.textContent = 'No screenshot-backed moments available yet.';
+    grid.append(empty);
+    return;
+  }}
+  HOME_MOMENTS.forEach((moment, index) => {{
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'home-moment' + (index === 0 ? ' home-moment-featured' : '');
+    button.setAttribute('aria-label', 'Open ' + moment.category + ' screenshot from ' + moment.ts);
+    button.addEventListener('click', () => openHomeMoment(index));
+    const img = document.createElement('img');
+    img.src = moment.src;
+    img.alt = '';
+    img.loading = index === 0 ? 'eager' : 'lazy';
+    const caption = document.createElement('span');
+    for (const [tag, value] of [['small', moment.in_window ? moment.category : moment.category + ' · Archive'],
+                                ['strong', moment.label], ['em', moment.ts]]) {{
+      const part = document.createElement(tag);
+      part.textContent = value;
+      caption.append(part);
+    }}
+    button.append(img, caption);
+    grid.append(button);
+  }});
 }}
 const dashboardClientId = (window.crypto && crypto.randomUUID)
   ? crypto.randomUUID()
@@ -6794,6 +6916,7 @@ function pulseMetric(value, label) {{
 }}
 
 function renderAccountPulse() {{
+  renderHomeMoments(pulseWindow);
   const pulse = ACCOUNT_PULSE[String(pulseWindow)];
   const verdict = document.getElementById('pulse-verdict');
   const meta = document.getElementById('pulse-meta');
@@ -6979,6 +7102,7 @@ const JOURNEY_EVENTS = {journey_json};
 let journeyRange = '3';
 let journeyMode = 'all';
 let journeySkill = '';
+let journeyVisible = 12;
 
 function journeyMonthLabel(month) {{
   const parts = month.split('-');
@@ -7011,7 +7135,10 @@ function renderJourneyFocus() {{
   if (!JOURNEY_EVENTS.length) {{ map.innerHTML = '<p class="empty-note">No dated level screenshots are available.</p>'; return; }}
   const months = journeyMonths();
   const fullTimelineWidth = 103 + (months.length * 21);
-  map.style.width = Math.max(760, map.parentElement.clientWidth, fullTimelineWidth) + 'px';
+  // CSS owns the available width so this remains correct even though the
+  // Journey page is hidden during initialization. Wider timelines still keep
+  // the existing horizontal scroll and the all-skills view remains the default.
+  map.style.setProperty('--journey-min-width', Math.max(760, fullTimelineWidth) + 'px');
   const monthSet = new Set(months);
   const inRange = JOURNEY_EVENTS.filter(event => monthSet.has(event.month));
   const skills = [...new Set(inRange.map(event => event.skill))].sort((a, b) => a.localeCompare(b));
@@ -7019,7 +7146,7 @@ function renderJourneyFocus() {{
   let html = '<div class="journey-axis" style="--month-count:' + months.length + '"><strong>Skill</strong>' + months.map((month, idx) => '<span>' + (months.length <= 18 || idx % 3 === 0 ? journeyMonthLabel(month) : '') + '</span>').join('') + '</div>';
   shownSkills.forEach(skill => {{
     const color = (inRange.find(event => event.skill === skill) || {{color:'#c8a45a'}}).color;
-    html += '<div class="journey-focus-row" style="--month-count:' + months.length + ';--skill-color:' + color + '"><strong>' + skill + '</strong>';
+    html += '<div class="journey-focus-row" style="--month-count:' + months.length + ';--skill-color:' + color + '"><button type="button" class="journey-skill-pick" data-journey-skill="' + skill + '" title="Show captured ' + skill + ' levels">' + skill + '</button>';
     months.forEach(month => {{
       const events = inRange.filter(event => event.skill === skill && event.month === month);
       html += events.length ? '<button class="journey-cell" data-journey-cell="' + skill + '|' + month + '" title="' + events.length + ' captured level' + (events.length === 1 ? '' : 's') + '"></button>' : '<span class="journey-cell"></span>';
@@ -7031,24 +7158,56 @@ function renderJourneyFocus() {{
     const [skill, month] = button.dataset.journeyCell.split('|');
     openJourneyEvents(inRange.filter(event => event.skill === skill && event.month === month));
   }}));
+  map.querySelectorAll('[data-journey-skill]').forEach(button => button.addEventListener('click', () => {{
+    journeySkill = button.dataset.journeySkill;
+    journeyVisible = 12;
+    document.getElementById('journey-skill-select').value = journeySkill;
+    renderJourneySequence();
+    if (journeyMode === 'one') renderJourneyFocus();
+    document.querySelector('.skill-journey-card').scrollIntoView({{behavior:'smooth',block:'start'}});
+  }}));
   document.getElementById('journey-coverage').textContent = inRange.length + ' captured level events across ' + skills.length + ' skills · blank months remain intentionally empty.';
 }}
 
 function renderJourneySequence() {{
   const container = document.getElementById('journey-sequence');
-  if (!container || !journeySkill) return;
-  const events = JOURNEY_EVENTS.filter(event => event.skill === journeySkill).sort((a, b) => a.level - b.level || a.iso.localeCompare(b.iso));
-  document.getElementById('journey-skill-title').textContent = journeySkill + ' Journey';
-  let html = '';
-  events.forEach((event, idx) => {{
-    if (idx && event.level - events[idx - 1].level > 1) html += '<div class="journey-gap">' + (event.level - events[idx - 1].level - 1) + ' levels not captured</div>';
-    html += '<div class="journey-level"><span>' + event.date + '</span><button data-journey-event="' + event.iso + '|' + event.level + '">' + event.level + '</button></div>';
+  if (!container) return;
+  const events = JOURNEY_EVENTS.filter(event => !journeySkill || event.skill === journeySkill)
+    .sort((a, b) => b.iso.localeCompare(a.iso) || b.level - a.level || a.skill.localeCompare(b.skill));
+  document.getElementById('journey-skill-title').textContent = journeySkill ? journeySkill + ' Level-Ups' : 'Captured Level-Ups';
+  document.getElementById('journey-sequence-meta').textContent = events.length
+    + ' screenshot-backed level-up' + (events.length === 1 ? '' : 's')
+    + (journeySkill ? ' in ' + journeySkill : ' across all skills') + ' · newest first';
+  container.replaceChildren();
+  if (!events.length) {{
+    const empty = document.createElement('p');
+    empty.className = 'empty-note';
+    empty.textContent = 'No captured levels for this selection.';
+    container.append(empty);
+  }}
+  events.slice(0, journeyVisible).forEach(event => {{
+    const article = document.createElement('article');
+    article.className = 'journey-level';
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.setAttribute('aria-label', 'Open ' + event.skill + ' level ' + event.level + ' screenshot from ' + event.date);
+    button.addEventListener('click', () => openJourneyEvents([event]));
+    const img = document.createElement('img');
+    img.src = event.src;
+    img.alt = '';
+    img.loading = 'lazy';
+    const caption = document.createElement('div');
+    caption.className = 'journey-level-caption';
+    const title = document.createElement('strong');
+    title.textContent = event.skill + ' ' + event.level;
+    const date = document.createElement('span');
+    date.textContent = event.date;
+    caption.append(title, date);
+    button.append(img, caption);
+    article.append(button);
+    container.append(article);
   }});
-  container.innerHTML = html || '<p class="empty-note">No captured levels for this skill.</p>';
-  container.querySelectorAll('[data-journey-event]').forEach(button => button.addEventListener('click', () => {{
-    const [iso, level] = button.dataset.journeyEvent.split('|');
-    openJourneyEvents(events.filter(event => event.iso === iso && String(event.level) === level));
-  }}));
+  document.getElementById('journey-more').hidden = events.length <= journeyVisible;
 }}
 
 (function initJourney() {{
@@ -7057,12 +7216,31 @@ function renderJourneySequence() {{
   const counts = {{}};
   JOURNEY_EVENTS.forEach(event => counts[event.skill] = (counts[event.skill] || 0) + 1);
   const skills = Object.keys(counts).sort((a, b) => counts[b] - counts[a] || a.localeCompare(b));
-  journeySkill = skills[0];
-  select.innerHTML = skills.map(skill => '<option value="' + skill + '">' + skill + '</option>').join('');
-  select.value = journeySkill;
-  select.addEventListener('change', () => {{ journeySkill = select.value; renderJourneyFocus(); renderJourneySequence(); }});
+  select.innerHTML = '<option value="">All skills</option>' + skills.map(skill => '<option value="' + skill + '">' + skill + '</option>').join('');
+  select.value = '';
+  select.addEventListener('change', () => {{
+    journeySkill = select.value;
+    journeyVisible = 12;
+    if (!journeySkill && journeyMode === 'one') {{
+      journeyMode = 'all';
+      document.querySelectorAll('[data-journey-mode]').forEach(item => item.classList.toggle('active', item.dataset.journeyMode === 'all'));
+    }}
+    renderJourneyFocus();
+    renderJourneySequence();
+  }});
+  document.getElementById('journey-more').addEventListener('click', () => {{ journeyVisible += 12; renderJourneySequence(); }});
   document.querySelectorAll('[data-journey-range]').forEach(button => button.addEventListener('click', () => {{ journeyRange = button.dataset.journeyRange; document.querySelectorAll('[data-journey-range]').forEach(item => item.classList.toggle('active', item === button)); renderJourneyFocus(); }}));
-  document.querySelectorAll('[data-journey-mode]').forEach(button => button.addEventListener('click', () => {{ journeyMode = button.dataset.journeyMode; document.querySelectorAll('[data-journey-mode]').forEach(item => item.classList.toggle('active', item === button)); renderJourneyFocus(); }}));
+  document.querySelectorAll('[data-journey-mode]').forEach(button => button.addEventListener('click', () => {{
+    journeyMode = button.dataset.journeyMode;
+    if (journeyMode === 'one' && !journeySkill) {{
+      journeySkill = JOURNEY_EVENTS[JOURNEY_EVENTS.length - 1].skill;
+      select.value = journeySkill;
+      journeyVisible = 12;
+      renderJourneySequence();
+    }}
+    document.querySelectorAll('[data-journey-mode]').forEach(item => item.classList.toggle('active', item === button));
+    renderJourneyFocus();
+  }}));
   renderJourneyFocus();
   renderJourneySequence();
 }})();
