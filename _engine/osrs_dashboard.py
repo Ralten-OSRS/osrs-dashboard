@@ -5241,7 +5241,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   .fav-columns span:last-child,.fav-rank {{ min-width:58px; }}
   .fav-rank {{ font-size:0.8rem; color:var(--text-dim); text-align:right; }}
   .rtm-remaining.fav-sorted,.fav-rank.fav-sorted {{ color:var(--gold); }}
-  .home-scroll-card #fav-bosses.has-ranks {{ max-height:306px; scrollbar-gutter:stable; }}
+  .home-scroll-card #fav-bosses.has-ranks {{ max-height:302px; scrollbar-gutter:stable; }}
   .home-activity-card {{ order:7; margin:0 !important; padding:15px 16px; }}
   .home-activity-card canvas {{ max-height:190px; }}
   .stats-story-row {{ order:8; margin:0 !important; }}
@@ -5489,6 +5489,52 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
     .boss-detail-hero-new img,.boss-detail-monogram {{ width:86px; height:70px; }}
     .boss-evidence-stats {{ grid-template-columns:1fr; }}
     .boss-evidence-grid {{ grid-template-columns:1fr; }}
+  }}
+
+  /* ── Bosses and Luck: keep the list beside its detail ──────────────────
+     Both pages are a list on the left and a detail panel on the right. The
+     list scrolled inside a fixed box while the page scrolled as well, so
+     reading down a long detail panel carried the list off the top of the
+     screen. The list column now stays pinned under the header and is as tall
+     as the window allows, so the next boss is always one click away. This
+     only applies where the two sit side by side. */
+  @media (min-width:901px) {{
+    .boss-directory-pane,.luck-list-panel {{ position:sticky; top:76px; align-self:start; }}
+    .boss-card-grid {{ max-height:max(320px,calc(100vh - 212px)); }}
+    .luck-list {{ max-height:max(320px,calc(100vh - 131px)); }}
+  }}
+
+  /* ── One style for every sort, filter and range choice ─────────────────
+     These controls were added page by page and had drifted into seven
+     variants: three heights, two weights, three type sizes, and some in
+     capitals where others were not. They all do the same job, choosing one
+     of a few views, so they share one look. */
+  .page :is(.pulse-window-btn,.wealth-control,.luck-sort-controls button,.journey-controls button,.boss-category-tabs button,.boss-sort-row button,.filter-btn,.chron-filter-btn,.chron-year-chip) {{
+    height:30px; padding:0 11px; border:1px solid var(--border-bright); border-radius:0; background:#0d0e0b; color:#c8bfae; box-shadow:none;
+    font:600 11px 'Cinzel',serif; letter-spacing:.4px; text-transform:uppercase; white-space:nowrap; cursor:pointer;
+  }}
+  .page :is(.pulse-window-btn,.wealth-control,.luck-sort-controls button,.journey-controls button,.boss-category-tabs button,.boss-sort-row button,.filter-btn,.chron-filter-btn,.chron-year-chip):hover {{
+    color:var(--gold); border-color:var(--gold-dim); background:#0d0e0b;
+  }}
+  .page :is(.pulse-window-btn,.wealth-control,.luck-sort-controls button,.journey-controls button,.boss-category-tabs button,.boss-sort-row button,.filter-btn,.chron-filter-btn).active {{
+    color:var(--gold-bright); border-color:var(--gold); background:#2a210d; box-shadow:none;
+  }}
+
+  /* ── Loot Log: rows share the width ────────────────────────────────────
+     A ledger row is a thumbnail, a name, a date and a value, and in one
+     full-width column it used about a quarter of its line. On a wide screen
+     the rows sit in two columns, three on an ultrawide, reading left to
+     right and then down in the selected order. */
+  .loot-table-heads,.loot-rows {{ display:grid; grid-template-columns:1fr; column-gap:26px; }}
+  .loot-head-extra {{ display:none; }}
+  @media (min-width:1280px) {{
+    .loot-table-heads,.loot-rows {{ grid-template-columns:1fr 1fr; }}
+    .loot-table-head,.loot-row {{ grid-template-columns:minmax(200px,1fr) 96px 104px; }}
+    .loot-head-extra:nth-child(2) {{ display:grid; }}
+  }}
+  @media (min-width:1900px) {{
+    .loot-table-heads,.loot-rows {{ grid-template-columns:1fr 1fr 1fr; }}
+    .loot-head-extra:nth-child(3) {{ display:grid; }}
   }}
 </style>
 </head>
@@ -5788,7 +5834,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   </section>
   <section class="card loot-ledger">
     <div class="loot-ledger-head"><div><span>Screenshot-backed wealth evidence</span><h2>The Drops Behind the Number</h2><p>Pending assemblies stay out of this realized-value ledger.</p></div><div class="loot-sort-controls"><button class="filter-btn active" onclick="sortLoot('value', this)">Highest Value</button><button class="filter-btn" onclick="sortLoot('date', this)">Newest First</button></div></div>
-    <div class="loot-table-head"><span>Event</span><span>Captured</span><span>Realized value</span></div>
+    <div class="loot-table-heads"><div class="loot-table-head"><span>Event</span><span>Captured</span><span>Realized value</span></div><div class="loot-table-head loot-head-extra" aria-hidden="true"><span>Event</span><span>Captured</span><span>Realized value</span></div><div class="loot-table-head loot-head-extra" aria-hidden="true"><span>Event</span><span>Captured</span><span>Realized value</span></div></div>
     <div class="loot-rows" id="loot-grid"></div>
   </section>
 </div>
@@ -6995,7 +7041,9 @@ function filterGallery(reset = true) {{
 
 function setFilter(cat, btn) {{
   activeFilter = cat;
-  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  // Scoped to the Gallery: the Loot Log's sort buttons share this class, and
+  // clearing every one of them left that page with no sort marked as chosen.
+  document.querySelectorAll('.gallery-controls .filter-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   filterGallery();
 }}
@@ -7630,6 +7678,7 @@ document.getElementById('luck-list')?.addEventListener('click', event => {{
   if (!row) return;
   selectedLuckBoss = row.dataset.luckBoss;
   renderLuck();
+  showDetailFromTop(document.getElementById('luck-detail'));
 }});
 renderLuck();
 
@@ -7801,6 +7850,15 @@ function renderBossDirectory() {{
   selectBoss(selectedBossIndex, false);
 }}
 
+// With the list pinned, a boss can be chosen while the page is scrolled deep
+// into the previous one's evidence. Bring the top of the new detail back
+// under the header so it is read from the start.
+function showDetailFromTop(panel) {{
+  if (!panel) return;
+  const top = panel.getBoundingClientRect().top;
+  if (top < 76) window.scrollTo({{top: window.scrollY + top - 86, left: 0, behavior: 'instant'}});
+}}
+
 function selectBoss(idx, rerender = true) {{
   selectedBossIndex = idx;
   document.querySelectorAll('.boss-directory-card').forEach(card => card.classList.toggle('active', Number(card.dataset.bossIndex) === idx));
@@ -7824,6 +7882,7 @@ function selectBoss(idx, rerender = true) {{
   document.getElementById('boss-detail-panel').innerHTML = '<div class="boss-detail-hero-new">' + visual + '<div><h2>' + b.boss + '</h2><p>' + (b.kc ? b.kc.toLocaleString() + ' tracked kills' : (b.virtual ? 'Drops shared between bosses' : 'KC unavailable')) + (b.rank ? ' · Hiscores rank ' + b.rank.toLocaleString() : '') + ' · ' + b.category + '</p><p>' + (b.gp_str ? b.gp_str + ' realized value logged' : 'No realized GP attributed') + '</p></div></div>'
     + '<div class="boss-evidence-stats"><div><strong>' + b.evidence_count + '</strong><span>Evidence items</span></div><div><strong>' + b.drops.length + '</strong><span>Valuable drops</span></div><div><strong>' + (b.ca_captured || 0) + (b.ca_total ? ' / ' + b.ca_total : '') + '</strong><span>CA screenshots / Wiki tasks</span></div></div>'
     + (evidenceHtml || '<p class="empty-note">No screenshots captured for this boss yet.</p>');
+  if (rerender) showDetailFromTop(document.getElementById('boss-detail-panel'));
 }}
 
 function openBossIdx(idx) {{
