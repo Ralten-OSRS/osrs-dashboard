@@ -39,7 +39,7 @@ REM The icon is copied next to the spec on purpose. PyInstaller resolves BOTH
 REM --icon and --add-data against the .spec file's folder, not the working
 REM directory -- and it writes --icon into the spec as a single-quoted Python
 REM string without escaping it, so an absolute path is not an option either:
-REM this project lives under "Kyle's Workspace", and that apostrophe ends the
+REM an apostrophe anywhere in the project folder path ends the
 REM string early and the spec fails to compile. Copying the icon into _build
 REM and naming it plainly sidesteps both problems and does not depend on how
 REM deep this script happens to sit. Three consecutive failed builds on
@@ -71,8 +71,8 @@ if /I "%~1"=="--skip-wiki" (
 REM Tee rather than redirect. Sending this to the log alone left the window
 REM blank for minutes and it read as a hang -- it was killed mid-run once
 REM because of it. $env:BUILDLOG is used instead of interpolating the path
-REM into the PowerShell string, because the path contains an apostrophe
-REM ("Kyle's Workspace") and would end the string early.
+REM into the PowerShell string, because an apostrophe anywhere in the
+REM path would end the string early.
 powershell -NoProfile -ExecutionPolicy Bypass -Command "python update_boss_drops.py 2>&1 | Tee-Object -FilePath $env:BUILDLOG -Append"
 if errorlevel 1 (
   echo(
