@@ -5378,6 +5378,11 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   #page-chronicle .memory-week {{ padding:14px 16px; }}
   #page-chronicle .chron-controls {{ margin:0; padding:10px; border:1px solid #45371d; background:#11120e; }}
   .chron-story {{ position:relative; display:grid; grid-template-columns:220px minmax(0,1fr); gap:12px; margin-bottom:9px; padding:10px; border:1px solid #44371f; background:#0d0f0c; }}
+  /* Month cards used about a third of a full-width row. Side by side they
+     fill it, and the page is roughly half as long. Order still reads newest
+     first, left to right and then down. */
+  .chron-story-grid {{ display:grid; grid-template-columns:repeat(auto-fill,minmax(min(520px,100%),1fr)); gap:9px; }}
+  .chron-story-grid .chron-story {{ margin-bottom:0; }}
   .chron-story-media {{ display:grid; grid-template-columns:2fr 1fr; grid-template-rows:1fr 1fr; gap:4px; min-height:126px; }}
   .chron-story-media button {{ padding:0; border:1px solid #49391c; background:#090a08; cursor:pointer; overflow:hidden; }}
   .chron-story-media button:first-child {{ grid-row:1/3; }}
@@ -7924,12 +7929,14 @@ function buildChronicle() {{
       if (!last || last.month !== month || last.events.length >= 4) {{ last = {{month: month, events: []}}; storyGroups.push(last); }}
       last.events.push(event);
     }});
+    html += '<div class="chron-story-grid">';
     storyGroups.forEach(function(group) {{
       var shots = group.events.filter(function(event) {{ return event.src; }});
       var media = shots.length ? '<div class="chron-story-media">' + shots.map(function(event) {{ return '<button onclick="openChronItem(' + event.idx + ')" aria-label="Open ' + event.title + ' screenshot"><img src="' + event.src + '" alt="" loading="lazy" onerror="hideChronImg(this)"></button>'; }}).join('') + '</div>' : '';
       var events = group.events.map(function(event) {{ return '<div class="chron-story-event"><strong>' + event.title + '</strong><span>' + event.badge + (event.sub ? ' · ' + event.sub : '') + ' · ' + event.ts_str + '</span></div>'; }}).join('');
       html += '<article class="chron-story"' + (media ? '' : ' style="grid-template-columns:1fr"') + '>' + media + '<div class="chron-story-body"><div class="chron-story-date">' + journeyMonthLabel(group.month) + '</div>' + events + '</div></article>';
     }});
+    html += '</div>';
     html += '</div>';
   }});
 
