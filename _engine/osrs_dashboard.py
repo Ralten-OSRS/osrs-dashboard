@@ -2720,6 +2720,10 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
             "category": category,
             "kc": hs_bosses.get(boss, 0),
             "rank": hs_boss_ranks.get(boss, 0),
+            # Shared-drop tiles are a place to file loot, not an encounter:
+            # they have no kill count and should never be the page's opening
+            # selection.
+            "virtual": boss in VIRTUAL_BOSSES,
             "gp": boss_gp_total.get(boss, 0),
             "gp_str": fmt_gp(boss_gp_total.get(boss, 0)) if boss_gp_total.get(boss, 0) else "",
             "representative": _boss_evidence[0]["src"] if _boss_evidence else "",
@@ -7536,7 +7540,9 @@ function openHofItem(idx) {{
 let BOSS_DATA = [];
 try {{ BOSS_DATA = {boss_cards_json}; }} catch(e) {{ console.error('Boss data parse error:', e); }}
 let bossRendered = false;
-let selectedBossIndex = 0;
+// -1 means nothing chosen yet: the directory then selects the first real boss
+// in the current order.
+let selectedBossIndex = -1;
 let bossCategory = 'All';
 let bossSortMode = 'evidence';
 const BOSS_SHOT_ITEMS = [];
@@ -7576,8 +7582,13 @@ function renderBosses() {{
 
 function sortBosses(mode, btn) {{
   bossSortMode = mode;
+  // A new order is a new question, so the detail panel follows it to the top
+  // row instead of staying on a boss that may now be far down the list.
+  selectedBossIndex = -1;
   document.querySelectorAll('[data-boss-sort]').forEach(item => item.classList.toggle('active', item === btn));
   renderBossDirectory();
+  const grid = document.getElementById('boss-grid');
+  if (grid) grid.scrollTop = 0;
 }}
 
 // Each sort falls through to the next most useful order on a tie. Rank is
@@ -7601,7 +7612,7 @@ function renderBossDirectory() {{
   let rows = BOSS_DATA.map((boss, index) => ({{boss, index}})).filter(item => (bossCategory === 'All' || item.boss.category === bossCategory) && (!search || item.boss.boss.toLowerCase().includes(search)));
   rows.sort((a, b) => compareBosses(a.boss, b.boss));
   if (!rows.length) {{ grid.innerHTML = '<p class="empty-note">No bosses match this view.</p>'; return; }}
-  if (!rows.some(item => item.index === selectedBossIndex)) selectedBossIndex = rows[0].index;
+  if (!rows.some(item => item.index === selectedBossIndex)) selectedBossIndex = (rows.find(item => !item.boss.virtual) || rows[0]).index;
   grid.innerHTML = rows.map(item => {{
     const b = item.boss;
     const initials = b.boss.split(/\\s+/).map(word => word[0]).join('').slice(0, 2);
@@ -7634,7 +7645,7 @@ function selectBoss(idx, rerender = true) {{
   const initials = b.boss.split(/\\s+/).map(word => word[0]).join('').slice(0, 2);
   const representativeIndex = Math.max(0, BOSS_SHOT_ITEMS.findIndex(item => item.src === b.representative));
   const visual = b.representative ? '<button class="boss-hero-shot" onclick="openBossIdx(' + representativeIndex + ')" aria-label="Open ' + b.boss + ' screenshots"><img src="' + b.representative + '" alt=""></button>' : '<div class="boss-detail-monogram">' + initials + '</div>';
-  document.getElementById('boss-detail-panel').innerHTML = '<div class="boss-detail-hero-new">' + visual + '<div><h2>' + b.boss + '</h2><p>' + (b.kc ? b.kc.toLocaleString() + ' tracked kills' : 'KC unavailable') + (b.rank ? ' · Hiscores rank ' + b.rank.toLocaleString() : '') + ' · ' + b.category + '</p><p>' + (b.gp_str ? b.gp_str + ' realized value logged' : 'No realized GP attributed') + '</p></div></div>'
+  document.getElementById('boss-detail-panel').innerHTML = '<div class="boss-detail-hero-new">' + visual + '<div><h2>' + b.boss + '</h2><p>' + (b.kc ? b.kc.toLocaleString() + ' tracked kills' : (b.virtual ? 'Drops shared between bosses' : 'KC unavailable')) + (b.rank ? ' · Hiscores rank ' + b.rank.toLocaleString() : '') + ' · ' + b.category + '</p><p>' + (b.gp_str ? b.gp_str + ' realized value logged' : 'No realized GP attributed') + '</p></div></div>'
     + '<div class="boss-evidence-stats"><div><strong>' + b.evidence_count + '</strong><span>Evidence items</span></div><div><strong>' + b.drops.length + '</strong><span>Valuable drops</span></div><div><strong>' + (b.ca_captured || 0) + (b.ca_total ? ' / ' + b.ca_total : '') + '</strong><span>CA screenshots / Wiki tasks</span></div></div>'
     + (evidenceHtml || '<p class="empty-note">No screenshots captured for this boss yet.</p>');
 }}
