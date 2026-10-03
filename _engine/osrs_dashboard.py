@@ -3535,9 +3535,12 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
         })
     top_value_events.sort(key=lambda event: event["value"], reverse=True)
 
-    # Top 5 events for the stats page highlight
+    # Value events for the Stats page highlight. More than five are written so
+    # the card can show as many as fit beside the Pet Archive, which grows with
+    # every pet; the stylesheet hides whole rows that do not fit and always
+    # leaves room for five.
     top5_html = ""
-    for i, event in enumerate(top_value_events[:5], start=1):
+    for i, event in enumerate(top_value_events[:14], start=1):
         top5_html += (
             '<div class="drop-top-row">'
             '<span class="drop-rank">' + f"{i:02d}" + '</span>'
@@ -5243,6 +5246,14 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   .home-activity-card canvas {{ max-height:190px; }}
   .stats-story-row {{ order:8; margin:0 !important; }}
   .stats-pets-card,.stats-value-card,.stats-hof-card {{ padding:15px 16px !important; }}
+  /* The value list takes whatever height the Pet Archive beside it sets. Rows
+     flow down a column and wrap into a second one when they run out of room;
+     the second column sits outside the box and is clipped, so the card shows
+     only whole rows and never a dead block underneath them. The minimum keeps
+     five rows visible however short the neighbouring card is. */
+  .stats-value-card {{ display:flex; flex-direction:column; }}
+  .drop-top-list {{ flex:1 1 0; min-height:212px; display:flex; flex-direction:column; flex-wrap:wrap; align-content:flex-start; overflow:hidden; }}
+  .drop-top-list .drop-top-row {{ width:100%; box-sizing:border-box; }}
   #page-stats .stats-pets-card .pet-thumb-grid {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(92px,1fr)); gap:8px; }}
   #page-stats .stats-pets-card .pet-thumb {{ width:auto; min-width:0; }}
   #page-stats .stats-pets-card .pet-thumb img {{ height:92px; }}
@@ -5378,6 +5389,11 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   #page-chronicle .memory-week {{ padding:14px 16px; }}
   #page-chronicle .chron-controls {{ margin:0; padding:10px; border:1px solid #45371d; background:#11120e; }}
   .chron-story {{ position:relative; display:grid; grid-template-columns:220px minmax(0,1fr); gap:12px; margin-bottom:9px; padding:10px; border:1px solid #44371f; background:#0d0f0c; }}
+  /* Month cards used about a third of a full-width row. Side by side they
+     fill it, and the page is roughly half as long. Order still reads newest
+     first, left to right and then down. */
+  .chron-story-grid {{ display:grid; grid-template-columns:repeat(auto-fill,minmax(min(520px,100%),1fr)); gap:9px; }}
+  .chron-story-grid .chron-story {{ margin-bottom:0; }}
   .chron-story-media {{ display:grid; grid-template-columns:2fr 1fr; grid-template-rows:1fr 1fr; gap:4px; min-height:126px; }}
   .chron-story-media button {{ padding:0; border:1px solid #49391c; background:#090a08; cursor:pointer; overflow:hidden; }}
   .chron-story-media button:first-child {{ grid-row:1/3; }}
@@ -5445,6 +5461,8 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
     .chron-story {{ grid-template-columns:1fr; }}
     .chron-story-media {{ min-height:180px; }}
     .stats-story-row {{ grid-template-columns:1fr; }}
+    .drop-top-list {{ display:block; flex:none; min-height:0; overflow:visible; }}
+    .drop-top-list .drop-top-row:nth-child(n+6) {{ display:none; }}
     .stats-hof-card .hof-grid {{ grid-template-columns:1fr 1fr; }}
   }}
   @media(max-width:430px) {{
@@ -5645,7 +5663,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
     </div>
     <div class="card stats-value-card">
       <div class="home-section-head"><div><span>The drops that changed the account</span><h2>Defining Value Events</h2></div><button class="home-text-link" onclick="goToPage('loot')">Full loot log →</button></div>
-      {top5_html if top5_html else '<p class="empty-note">No valuable drop data parsed.</p>'}
+      {('<div class="drop-top-list">' + top5_html + '</div>') if top5_html else '<p class="empty-note">No valuable drop data parsed.</p>'}
     </div>
   </div>
 
@@ -7924,12 +7942,14 @@ function buildChronicle() {{
       if (!last || last.month !== month || last.events.length >= 4) {{ last = {{month: month, events: []}}; storyGroups.push(last); }}
       last.events.push(event);
     }});
+    html += '<div class="chron-story-grid">';
     storyGroups.forEach(function(group) {{
       var shots = group.events.filter(function(event) {{ return event.src; }});
       var media = shots.length ? '<div class="chron-story-media">' + shots.map(function(event) {{ return '<button onclick="openChronItem(' + event.idx + ')" aria-label="Open ' + event.title + ' screenshot"><img src="' + event.src + '" alt="" loading="lazy" onerror="hideChronImg(this)"></button>'; }}).join('') + '</div>' : '';
       var events = group.events.map(function(event) {{ return '<div class="chron-story-event"><strong>' + event.title + '</strong><span>' + event.badge + (event.sub ? ' · ' + event.sub : '') + ' · ' + event.ts_str + '</span></div>'; }}).join('');
       html += '<article class="chron-story"' + (media ? '' : ' style="grid-template-columns:1fr"') + '>' + media + '<div class="chron-story-body"><div class="chron-story-date">' + journeyMonthLabel(group.month) + '</div>' + events + '</div></article>';
     }});
+    html += '</div>';
     html += '</div>';
   }});
 
