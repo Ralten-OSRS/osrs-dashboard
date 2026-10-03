@@ -3093,9 +3093,42 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
     drops_json = [
         {"item": d["item"], "qty": d["qty"], "value": d["value"],
          "src": d["rel_path"], "ts": d["ts_str"],
-         "ts_iso": d["timestamp"].isoformat() if d["timestamp"] else ""}
+         "ts_iso": d["timestamp"].isoformat() if d["timestamp"] else "",
+         "kind": "drop"}
         for d in drops_sorted
     ]
+    # Completed assemblies are part of the realized total in the page headline,
+    # so they are rows in the ledger beneath it. Without them the rows added up
+    # to direct drops only and the headline could not be reconciled against the
+    # list titled as the evidence behind it. Each row carries the screenshots of
+    # the components that completed it.
+    assembled_rows = 0
+    for event in economic_value.get("events", []):
+        try:
+            completed_at = datetime.fromisoformat(event["completed_at"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        shots = [
+            {"src": piece["rel_path"], "label": piece.get("item", "")}
+            for piece in event.get("evidence", [])
+            if piece.get("rel_path")
+        ]
+        drops_json.append({
+            "item": event.get("label", "Completed assembly"), "qty": 1,
+            "value": int(event.get("value", 0)),
+            "src": shots[0]["src"] if shots else "",
+            "ts": completed_at.strftime("%b %d, %Y"),
+            "ts_iso": completed_at.isoformat(),
+            "kind": "assembled",
+            "shots": shots,
+        })
+        assembled_rows += 1
+    ledger_rows = len(drops_json)
+    ledger_note = (
+        f"{len(drops_sorted):,} drop{'s' if len(drops_sorted) != 1 else ''} and "
+        f"{assembled_rows:,} completed assembl{'ies' if assembled_rows != 1 else 'y'}"
+        if assembled_rows else "Every row opens its evidence"
+    )
 
     pending_value = int(economic_value.get("latent_total", 0))
     pending_value_str = fmt_gp(pending_value) if pending_value else "None"
@@ -5329,6 +5362,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   .loot-row-main {{ display:grid; grid-template-columns:92px minmax(0,1fr); gap:10px; align-items:center; }}
   .loot-thumb-btn {{ width:92px; height:56px; padding:0; overflow:hidden; border:1px solid #59451f; background:#090a08; cursor:pointer; }}
   .loot-thumb-btn img {{ width:100%; height:100%; display:block; object-fit:cover; transition:transform .16s ease; }}
+  .loot-thumb-empty {{ display:block; cursor:default; }}
   .loot-thumb-btn:hover,.loot-thumb-btn:focus-visible {{ border-color:var(--gold-bright); outline:none; box-shadow:0 0 0 2px rgba(200,146,42,.18); }}
   .loot-thumb-btn:hover img,.loot-thumb-btn:focus-visible img {{ transform:scale(1.035); }}
   .loot-row strong,.loot-row span {{ display:block; }}
@@ -5724,12 +5758,12 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
 <div id="page-loot" class="page">
   <section class="loot-summary-grid">
     <article><strong>{total_gp_str}</strong><span>Total GP logged</span><small>Realized screenshot evidence</small></article>
-    <article><strong>{total_drops:,}</strong><span>Drop screenshots</span><small>Every row opens its evidence</small></article>
+    <article><strong>{ledger_rows:,}</strong><span>Value events</span><small>{ledger_note}</small></article>
     <article><strong>{fmt_gp(top_value_events[0]['value']) if top_value_events else '—'}</strong><span>Largest value event</span><small>{top_value_events[0]['label'] if top_value_events else 'No parsed event'}</small></article>
   </section>
   <section class="card loot-ledger">
     <div class="loot-ledger-head"><div><span>Screenshot-backed wealth evidence</span><h2>The Drops Behind the Number</h2><p>Pending assemblies stay out of this realized-value ledger.</p></div><div class="loot-sort-controls"><button class="filter-btn active" onclick="sortLoot('value', this)">Highest Value</button><button class="filter-btn" onclick="sortLoot('date', this)">Newest First</button></div></div>
-    <div class="loot-table-head"><span>Drop</span><span>Captured</span><span>Realized value</span></div>
+    <div class="loot-table-head"><span>Event</span><span>Captured</span><span>Realized value</span></div>
     <div class="loot-rows" id="loot-grid"></div>
   </section>
 </div>
@@ -7592,21 +7626,45 @@ function sortLoot(key, btn) {{
   renderLoot();
 }}
 
+// Ledger rows in the selected order. Shared by the list and the lightbox so a
+// thumbnail always opens the screenshot it shows.
+function sortedLootRows() {{
+  return [...DROPS].sort((a, b) => lootSortKey === 'value' ? b.value - a.value : (b.ts_iso > a.ts_iso ? 1 : -1));
+}}
+
+function lootRowNote(drop) {{
+  if (drop.kind !== 'assembled') return 'Valuable drop';
+  const count = (drop.shots || []).length;
+  return count ? 'Assembled · ' + count + ' component screenshot' + (count === 1 ? '' : 's') : 'Assembled';
+}}
+
 function renderLoot() {{
   const grid = document.getElementById('loot-grid');
   if (!grid) return;
-  const sorted = [...DROPS].sort((a, b) => lootSortKey === 'value' ? b.value - a.value : (b.ts_iso > a.ts_iso ? 1 : -1));
-  grid.innerHTML = sorted.map((drop, idx) => {{
+  grid.innerHTML = sortedLootRows().map((drop, idx) => {{
     const qty = drop.qty > 1 ? drop.qty + 'x ' : '';
-    return '<article class="loot-row"><div class="loot-row-main"><button type="button" class="loot-thumb-btn" aria-label="Open drop screenshot" onclick="openLootEvidence(' + idx + ')"><img src="' + drop.src + '" alt="" loading="lazy"></button><div><strong>' + qty + drop.item + '</strong><span>Valuable drop screenshot</span></div></div>'
+    const thumb = drop.src
+      ? '<button type="button" class="loot-thumb-btn" aria-label="Open screenshot" onclick="openLootEvidence(' + idx + ')"><img src="' + drop.src + '" alt="" loading="lazy"></button>'
+      : '<span class="loot-thumb-btn loot-thumb-empty"></span>';
+    return '<article class="loot-row"><div class="loot-row-main">' + thumb + '<div><strong>' + qty + drop.item + '</strong><span>' + lootRowNote(drop) + '</span></div></div>'
       + '<span>' + drop.ts + '</span><span class="loot-row-value">' + fmtGP(drop.value) + ' gp</span></article>';
   }}).join('');
 }}
 
 function openLootEvidence(idx) {{
-  const sorted = [...DROPS].sort((a, b) => lootSortKey === 'value' ? b.value - a.value : (b.ts_iso > a.ts_iso ? 1 : -1));
-  lbItems = sorted.map(d => ({{src: d.src, label: (d.qty > 1 ? d.qty + 'x ' : '') + d.item, ts: d.ts}}));
-  lbIndex = idx;
+  // One lightbox run over every row's evidence: a drop contributes its
+  // screenshot, an assembly contributes each component screenshot.
+  const rows = sortedLootRows();
+  const items = [];
+  let start = 0;
+  rows.forEach((d, rowIndex) => {{
+    if (rowIndex === idx) start = items.length;
+    const name = (d.qty > 1 ? d.qty + 'x ' : '') + d.item;
+    if (d.kind === 'assembled') (d.shots || []).forEach(shot => items.push({{src: shot.src, label: name + (shot.label ? ' · ' + shot.label : ''), ts: d.ts}}));
+    else if (d.src) items.push({{src: d.src, label: name, ts: d.ts}});
+  }});
+  lbItems = items;
+  lbIndex = start;
   showLb();
   document.getElementById('lightbox').classList.add('open');
 }}
