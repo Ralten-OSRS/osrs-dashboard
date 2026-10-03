@@ -3216,7 +3216,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
     if hof_sorted:
         for idx, h in enumerate(hof_sorted):
             has_shot = bool(h.get("rel_path"))
-            click_attr = f' onclick="openHofItem({idx})" style="cursor:pointer"' if has_shot else ''
+            click_attr = f' onclick="openHofItem({idx})" tabindex="0" role="button" style="cursor:pointer"' if has_shot else ''
             hof_html += (
                 f'<div class="hof-item"{click_attr}>'
                 + ('<img class="hof-shot" src="' + h.get("rel_path", "") + '" alt="" loading="lazy">' if has_shot else '')
@@ -3919,6 +3919,7 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   }}
   .pet-thumb:hover {{ border-color: var(--gold); }}
   .pet-thumb:focus-visible {{ outline: 2px solid var(--gold-bright); outline-offset: 2px; }}
+  .gallery-item:focus-visible,.memory-card:focus-visible,.hof-item:focus-visible {{ outline: 2px solid var(--gold-bright); outline-offset: 2px; }}
   .pet-thumb img {{
     width: 100%;
     height: 70px;
@@ -6915,6 +6916,8 @@ function renderGallery() {{
     const div = document.createElement('div');
     div.className = 'gallery-item';
     div.onclick = () => openLightbox(idx);
+    div.tabIndex = 0;
+    div.setAttribute('role', 'button');
     div.innerHTML = `
       <img src="${{item.src}}" alt="${{item.label}}" loading="lazy" onerror="this.style.display='none'">
       <div class="thumb-info">
@@ -7730,7 +7733,7 @@ function renderMemoryWeek() {{
   const start = memoryPageIndex * MEMORY_PAGE_SIZE;
   const pageItems = THIS_WEEK_MEMORIES.slice(start, start + MEMORY_PAGE_SIZE);
   grid.innerHTML = pageItems.map(function(memory) {{
-    return '<div class="memory-card" onclick="openMemoryItem(' + memory.idx + ')">'
+    return '<div class="memory-card" tabindex="0" role="button" onclick="openMemoryItem(' + memory.idx + ')">'
       + '<img src="' + memory.src + '" alt="" loading="lazy">'
       + '<div class="memory-card-body">'
       + '<div class="memory-card-top"><span class="memory-badge" style="color:' + memory.color + '">'
@@ -7911,6 +7914,16 @@ window.addEventListener('hashchange', () => {{
 
 document.addEventListener('keydown', event => {{
   if (event.key === 'Escape') closeNavigation();
+}});
+
+// Screenshot cards are built as plain blocks, so the keyboard needs telling
+// that Enter and Space open them the way a click does.
+document.addEventListener('keydown', event => {{
+  if (event.key !== 'Enter' && event.key !== ' ') return;
+  const card = event.target;
+  if (!card.matches || !card.matches('.gallery-item, .memory-card, .hof-item[role="button"]')) return;
+  event.preventDefault();
+  card.click();
 }});
 
 // Initialize the static gallery immediately, then enable durable interaction
