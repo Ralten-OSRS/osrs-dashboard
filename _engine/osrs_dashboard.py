@@ -5276,7 +5276,12 @@ def build_html(data, hiscores=None, xp_history=None, favorite_paths=None,
   #rtm-detail .rtm-detail-row {{ padding:7px 8px; border:1px solid #40351f; background:#0d0f0c; }}
   #rtm-detail .rtm-detail-top {{ margin-bottom:5px; }}
   #rtm-detail .rtm-detail-meta {{ font-family:'Segoe UI',Arial,sans-serif; font-size:11px; }}
-  #rtm-detail .rtm-detail-meta span {{ white-space:nowrap; }}
+  /* One line per skill summary where the tiles are wide enough to hold it.
+     Narrower than this the three parts wrap, because forcing them onto one
+     line pushed the tile past the edge of the window. */
+  @media (min-width:1181px) {{
+    #rtm-detail .rtm-detail-meta span {{ white-space:nowrap; }}
+  }}
   .journey-xp-panel {{ min-width:0; padding-left:16px; border-left:1px solid #49391c; }}
   .journey-xp-panel h3 {{ margin-bottom:9px; color:var(--text); font:600 12px 'Cinzel',serif; text-transform:uppercase; }}
   .journey-xp-panel canvas {{ max-height:240px; }}
